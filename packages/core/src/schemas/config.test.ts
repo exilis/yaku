@@ -28,4 +28,29 @@ describe("config", () => {
     const ja = resolveConfig(c, "ja");
     expect(ja.maxIterations).toBe(2);
   });
+
+  it("nested per-language override preserves sibling fields", () => {
+    const c = resolveConfig({
+      tm: { enabled: false },
+      perLanguage: { ja: { tm: { fuzzy: "off" } } },
+    });
+    const ja = resolveConfig(c, "ja");
+    expect(ja.tm.enabled).toBe(false); // preserved from global
+    expect(ja.tm.fuzzy).toBe("off"); // overridden
+    expect(ja.tm.fuzzyThreshold).toBe(0.85); // default preserved
+  });
+
+  it("request-level nested partial preserves defaults", () => {
+    const c = resolveConfig({ tm: { fuzzy: "off" } });
+    expect(c.tm.fuzzy).toBe("off");
+    expect(c.tm.enabled).toBe(true); // default preserved, not clobbered
+  });
+
+  it(".strict() rejects unknown top-level key", () => {
+    expect(() => TranslationConfigSchema.parse({ bogus: 1 })).toThrow();
+  });
+
+  it("maxIterations: 0 is rejected", () => {
+    expect(() => TranslationConfigSchema.parse({ maxIterations: 0 })).toThrow();
+  });
 });

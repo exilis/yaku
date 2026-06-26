@@ -4,7 +4,7 @@ export const SegmentMetadataSchema = z
   .object({
     role: z.string().optional(),
     group: z.string().optional(),
-    order: z.number().optional(),
+    order: z.number().int().optional(),
     maxChars: z.number().int().positive().optional(),
     doNotTranslate: z.boolean().optional(),
     notes: z.string().optional(),
@@ -14,6 +14,8 @@ export const SegmentMetadataSchema = z
 export const SegmentSchema = z
   .object({
     id: z.string().min(1),
+    // Empty string is intentionally allowed: a caller's DB field may
+    // legitimately be empty, so do not constrain with .min(1).
     text: z.string(),
     metadata: SegmentMetadataSchema.optional(),
   })
@@ -26,7 +28,10 @@ export const GlossaryEntrySchema = z
     caseSensitive: z.boolean().optional(),
     lang: z.string().optional(),
   })
-  .strict();
+  .strict()
+  .refine((e) => e.lang === undefined || e.target !== undefined, {
+    message: "lang can only be set when target is provided (lang scopes a forced mapping)",
+  });
 
 export type Segment = z.infer<typeof SegmentSchema>;
 export type SegmentMetadata = z.infer<typeof SegmentMetadataSchema>;

@@ -15,6 +15,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "openai": "^4.67.0",
     "zod": "^3.23.0"
   }
 }

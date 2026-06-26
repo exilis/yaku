@@ -26,6 +26,17 @@ export interface GroupLoopResult {
 
 export async function runGroupLoop(group: AssembledGroup, deps: GroupLoopDeps): Promise<GroupLoopResult> {
   const { provider, tm, config, cost } = deps;
+
+  if (!config.models.translator) {
+    throw new Error("runGroupLoop: config.models.translator is required");
+  }
+  if (config.reviewer.enabled && !config.models.reviewer) {
+    throw new Error("runGroupLoop: config.models.reviewer is required when reviewer is enabled");
+  }
+  if (config.backTranslation.enabled && !config.models.backTranslator) {
+    throw new Error("runGroupLoop: config.models.backTranslator is required when backTranslation is enabled");
+  }
+
   const trace = new GroupTrace(group.groupKey, group.targetLang);
   const ns = config.tm.namespace;
 
@@ -130,8 +141,14 @@ export async function runGroupLoop(group: AssembledGroup, deps: GroupLoopDeps): 
       });
       cost.add(revRes.usage);
       draft = revRes.value.translations;
-      stopReason = "back-translation-ok";
-      trace.iteration({ draft: { ...draft }, gateViolations: [], reviewerPassed: true, cost: cost.total });
+      confidence = {}; // revised draft was not reviewed; prior confidence no longer applies
+      // Re-gate the revised draft — the back-translation fix must not silently
+      // reintroduce mechanical violations into committed output.
+      const revViolations = runGates(llmGroup, { translations: draft });
+      const revGateMsgs = revViolations.map((v) => `[${v.gate}/${v.segmentId}] ${v.message}`);
+      trace.iteration({ draft: { ...draft }, gateViolations: revGateMsgs, reviewerPassed: false, cost: cost.total });
+      // Only treat as a clean success if the revised draft still passes gates.
+      stopReason = revViolations.length === 0 ? "back-translation-ok" : "max-iterations";
     } else {
       stopReason = "back-translation-ok";
     }

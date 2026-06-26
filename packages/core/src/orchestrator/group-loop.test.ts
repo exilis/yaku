@@ -85,4 +85,28 @@ describe("runGroupLoop", () => {
     const stored = await tm.lookupExact("Hello world friend", "en", "ja");
     expect(stored?.translatedText).toBe("確定訳");
   });
+
+  it("runs back-translation and revises on high drift", async () => {
+    const provider = new MockProvider({
+      translator: [
+        { translations: { s1: "初稿" } },
+        { translations: { s1: "改訂稿" } }, // revision after drift
+      ],
+      reviewer: [{ passed: true, confidence: { s1: 0.9 }, critique: "" }],
+      backTranslator: [{ translations: { s1: "totally unrelated text here" } }],
+    });
+    const tm = new SqliteTranslationMemory(":memory:");
+    const cfg2 = resolveConfig({
+      models: {
+        translator: { provider: "mock", model: "m" },
+        reviewer: { provider: "mock", model: "m" },
+        backTranslator: { provider: "mock", model: "m" },
+      },
+      backTranslation: { enabled: true, driftThreshold: 0.2 },
+    });
+    const g = { groupKey: "g", sourceLang: "en", targetLang: "ja", glossary: [], segments: [{ id: "s1", text: "Hello world friend" }] } as const;
+    const r = await runGroupLoop(g as any, { provider, tm, config: cfg2, cost: new CostTracker() });
+    expect(r.stopReason).toBe("back-translation-ok");
+    expect(r.results[0]!.translatedText).toBe("改訂稿");
+  });
 });

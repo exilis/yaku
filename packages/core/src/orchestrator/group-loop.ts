@@ -6,7 +6,8 @@ import { CostTracker } from "../cost/budget.js";
 import { runGates } from "../gates/index.js";
 import { sourceHash } from "../util/hash.js";
 import { TranslationDraftSchema, ReviewSchema } from "./reviewer.js";
-import { buildTranslatorPrompt, buildReviewerPrompt } from "./prompts.js";
+import { buildTranslatorPrompt, buildReviewerPrompt, buildBackTranslationPrompt } from "./prompts.js";
+import { semanticDrift } from "./back-translation.js";
 import { GroupTrace, type StopReason } from "../trace/trace.js";
 
 export interface GroupLoopDeps {
@@ -106,10 +107,39 @@ export async function runGroupLoop(group: AssembledGroup, deps: GroupLoopDeps): 
 
   trace.finish(stopReason);
 
-  // 6. (Back-translation is added in Task 26.)
+  // 6. OPTIONAL BACK-TRANSLATION (config-gated)
+  if (config.backTranslation.enabled && stopReason === "accepted" && config.models.backTranslator) {
+    const btRes = await provider.complete({
+      role: "backTranslator", system: "You are a back-translation checker.",
+      prompt: buildBackTranslationPrompt(llmGroup, draft),
+      schema: TranslationDraftSchema,
+      model: config.models.backTranslator.model, temperature: config.models.backTranslator.temperature,
+    });
+    cost.add(btRes.usage);
+    const back = btRes.value.translations;
+    const drifted = needLLM.filter((s) => semanticDrift(s.text, back[s.id] ?? "") > config.backTranslation.driftThreshold);
+    if (drifted.length > 0 && iteration < config.maxIterations) {
+      // One bounded extra revise pass focused on drifted segments.
+      iteration++;
+      critique = `Back-translation drift detected on: ${drifted.map((s) => s.id).join(", ")}. Improve fidelity.`;
+      const prompt = buildTranslatorPrompt(llmGroup, { critique, suggestions });
+      const revRes = await provider.complete({
+        role: "translator", system: "You are a professional translator.",
+        prompt, schema: TranslationDraftSchema,
+        model: config.models.translator!.model, temperature: config.models.translator!.temperature,
+      });
+      cost.add(revRes.usage);
+      draft = revRes.value.translations;
+      stopReason = "back-translation-ok";
+      trace.iteration({ draft: { ...draft }, gateViolations: [], reviewerPassed: true, cost: cost.total });
+    } else {
+      stopReason = "back-translation-ok";
+    }
+    trace.finish(stopReason);
+  }
 
   // 7. COMMIT accepted translations to TM
-  if (config.tm.enabled && stopReason === "accepted") {
+  if (config.tm.enabled && (stopReason === "accepted" || stopReason === "back-translation-ok")) {
     for (const seg of needLLM) {
       const text = draft[seg.id];
       if (text !== undefined) {
@@ -143,7 +173,7 @@ function finalize(
     return {
       id: seg.id, translatedText: text, status: "translated", sourceHash: hash,
       confidence: confidence[seg.id],
-      warnings: stopReason !== "accepted" ? [`stopped: ${stopReason}`] : undefined,
+      warnings: stopReason !== "accepted" && stopReason !== "back-translation-ok" ? [`stopped: ${stopReason}`] : undefined,
     };
   });
   return { results, iterations, stopReason, trace: trace.toJSON() };

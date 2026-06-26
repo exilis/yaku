@@ -33,4 +33,19 @@ describe("response schemas", () => {
     const r = SegmentResultSchema.safeParse({ id: "t", translatedText: "x", status: "bogus", sourceHash: "h" });
     expect(r.success).toBe(false);
   });
+
+  it("rejects an unknown key on a segment result", () => {
+    const r = SegmentResultSchema.safeParse({ id: "t", translatedText: "x", status: "translated", sourceHash: "h", bogus: 1 });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a tmMatch score above 1", () => {
+    const r = SegmentResultSchema.safeParse({ id: "t", translatedText: "x", status: "reused", sourceHash: "h", tmMatch: { type: "fuzzy", score: 1.5 } });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects confidence above 1", () => {
+    const r = SegmentResultSchema.safeParse({ id: "t", translatedText: "x", status: "translated", sourceHash: "h", confidence: 2 });
+    expect(r.success).toBe(false);
+  });
 });

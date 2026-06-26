@@ -15,7 +15,7 @@ export const SegmentResultSchema = z
     status: z.enum(["translated", "reused", "unchanged", "skipped", "failed"]),
     sourceHash: z.string(),
     tmMatch: z
-      .object({ type: z.enum(["exact", "fuzzy"]), score: z.number() })
+      .object({ type: z.enum(["exact", "fuzzy"]), score: z.number().min(0).max(1) })
       .strict()
       .optional(),
     confidence: z.number().min(0).max(1).optional(),
@@ -53,6 +53,7 @@ export const TranslationResponseSchema = z
     sourceLang: z.string(),
     results: z.array(LanguageResultSchema),
     summary: SummarySchema,
+    // TODO(trace): replace z.unknown() with DocumentTraceSchema once the trace module lands
     trace: z.unknown().optional(),
   })
   .strict();

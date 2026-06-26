@@ -53,7 +53,8 @@ export const TranslationResponseSchema = z
     sourceLang: z.string(),
     results: z.array(LanguageResultSchema),
     summary: SummarySchema,
-    // TODO(trace): replace z.unknown() with DocumentTraceSchema once the trace module lands
+    // Opaque diagnostic payload (DocumentTrace), emitted only when config.trace !== "none".
+    // It is output-only and not validated on input, so it is left permissive by design.
     trace: z.unknown().optional(),
   })
   .strict();

@@ -17,10 +17,14 @@ program
   .option("--provider <name>", "LLM provider", "openai")
   .option("--tm <path>", "SQLite TM path", ":memory:")
   .option("--trace <level>", "none|summary|full")
+  .option("--source <lang>", "override source language")
+  .option("--target <langs>", "override target languages (comma-separated)")
   .action(async (opts) => {
     const raw = opts.in ? readFileSync(opts.in, "utf8") : readFileSync(0, "utf8");
     const request = JSON.parse(raw);
     if (opts.trace) request.config = { ...(request.config ?? {}), trace: opts.trace };
+    if (opts.source) request.sourceLang = opts.source;
+    if (opts.target) request.targetLangs = String(opts.target).split(",").map((s: string) => s.trim()).filter(Boolean);
 
     const deps: TranslateDeps = {
       provider: createProvider({ provider: opts.provider }),

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 import {
   translate, TranslationRequestSchema, createProvider, createTranslationMemory,
   type TranslateDeps, type TranslationRequest,
@@ -27,10 +28,19 @@ export function makeInvalidateHandler(deps: TranslateDeps) {
   };
 }
 
+/** Pure tm_lookup handler — exact TM lookup, returns the entry JSON (or null). */
+export function makeLookupHandler(deps: TranslateDeps) {
+  return async (args: { sourceText: string; sourceLang: string; targetLang: string; namespace?: string }): Promise<ToolContent> => {
+    const entry = await deps.tm.lookupExact(args.sourceText, args.sourceLang, args.targetLang, args.namespace);
+    return { content: [{ type: "text", text: JSON.stringify(entry) }] };
+  };
+}
+
 export function createMcpServer(deps: TranslateDeps): McpServer {
   const server = new McpServer({ name: "yaku", version: "0.1.0" });
   const handler = makeTranslateHandler(deps);
   const invalidateHandler = makeInvalidateHandler(deps);
+  const lookupHandler = makeLookupHandler(deps);
   const optStr = TranslationRequestSchema.shape.sourceLang.optional();
 
   server.registerTool(
@@ -55,6 +65,21 @@ export function createMcpServer(deps: TranslateDeps): McpServer {
       },
     },
     async (args) => (await invalidateHandler(args)) as ToolContent & { [x: string]: unknown }
+  );
+
+  server.registerTool(
+    "tm_lookup",
+    {
+      title: "Look up translation memory",
+      description: "Exact TM lookup; returns the matching entry JSON or null.",
+      inputSchema: {
+        sourceText: z.string(),
+        sourceLang: z.string(),
+        targetLang: z.string(),
+        namespace: z.string().optional(),
+      },
+    },
+    async (args) => (await lookupHandler(args)) as ToolContent & { [x: string]: unknown }
   );
 
   return server;

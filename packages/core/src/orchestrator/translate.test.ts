@@ -81,4 +81,19 @@ describe("translate", () => {
     const res = await translate(r4, { provider, tm });
     expect(res.results[0]!.summary.budgetHit).toBe(true);
   });
+
+  it("summary trace omits per-iteration drafts; full trace includes them", async () => {
+    const mk = () => new MockProvider({ translator: [{ translations: { t: "訳" } }], reviewer: [{ passed: true, confidence: { t: 0.9 }, critique: "" }] });
+    const baseReq = (trace: "summary" | "full"): TranslationRequest => ({
+      sourceLang: "en", targetLangs: ["ja"],
+      document: { id: "d", segments: [{ id: "t", text: "Hello there now" }] },
+      config: { trace, tm: { enabled: false, fuzzy: "off", fuzzyThreshold: 0.85 }, models: { translator: { provider: "mock", model: "m" }, reviewer: { provider: "mock", model: "m" } } },
+    });
+    const sum = await translate(baseReq("summary"), { provider: mk(), tm: new SqliteTranslationMemory(":memory:") });
+    const full = await translate(baseReq("full"), { provider: mk(), tm: new SqliteTranslationMemory(":memory:") });
+    const sumGroup = (sum.trace as { groups: Array<{ iterations: unknown }> }).groups[0]!;
+    const fullGroup = (full.trace as { groups: Array<{ iterations: unknown }> }).groups[0]!;
+    expect(typeof sumGroup.iterations).toBe("number"); // summarized to a count
+    expect(Array.isArray(fullGroup.iterations)).toBe(true); // full detail retained
+  });
 });

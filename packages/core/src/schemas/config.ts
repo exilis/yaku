@@ -40,7 +40,6 @@ const TmObject = z
 const BudgetObject = z
   .object({
     maxUsd: z.number().optional(),
-    maxIterations: z.number().int().positive().optional(),
     onExceed: z.enum(["best-so-far"]).default("best-so-far"),
   })
   .strict();

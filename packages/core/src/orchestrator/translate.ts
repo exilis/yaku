@@ -10,6 +10,7 @@ import { runGroupLoop } from "./group-loop.js";
 import { CostTracker } from "../cost/budget.js";
 import { sourceHash } from "../util/hash.js";
 import type { AssembledGroup } from "../gates/types.js";
+import type { GroupTraceJSON } from "../trace/trace.js";
 
 export interface TranslateDeps {
   provider: LLMProvider;
@@ -48,7 +49,19 @@ export async function translate(req: TranslationRequest, deps: TranslateDeps): P
           const r = await runGroupLoop(assembled, { provider: deps.provider, tm: deps.tm, config, cost });
           segResults.push(...r.results);
           iterationsTotal += r.iterations;
-          if (config.trace !== "none") documentTraces.push(r.trace);
+          if (config.trace === "summary") {
+            // Summary trace: keep the shape but drop per-iteration drafts —
+            // surface only the stop reason and an iteration count per group.
+            const t = r.trace as GroupTraceJSON;
+            documentTraces.push({
+              groupKey: t.groupKey,
+              targetLang: t.targetLang,
+              stopReason: t.stopReason,
+              iterations: t.iterations.length,
+            });
+          } else if (config.trace !== "none") {
+            documentTraces.push(r.trace);
+          }
         } catch (err) {
           for (const s of translatable) {
             segResults.push({ id: s.id, translatedText: "", status: "failed", sourceHash: sourceHash(s.text), error: String(err) });

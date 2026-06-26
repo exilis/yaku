@@ -37,6 +37,8 @@ echo '{"sourceLang":"en","targetLangs":["ja","ko"],"document":{"segments":[{"id"
   | OPENAI_API_KEY=sk-... node packages/cli/dist/index.js translate --provider openai
 ```
 
+`--source <lang>` and `--target <langs>` (comma-separated) override the request's source/target languages on the CLI without editing the JSON. `--trace <none|summary|full>` overrides the trace level.
+
 Exit codes: `0` ok, `1` partial, `2` failed. Use `--provider mock` to validate wiring without an API key.
 
 Manage translation memory:

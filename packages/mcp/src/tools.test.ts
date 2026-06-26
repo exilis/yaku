@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { makeTranslateHandler, makeInvalidateHandler, createMcpServer } from "./index.js";
+import { makeTranslateHandler, makeInvalidateHandler, makeLookupHandler, createMcpServer } from "./index.js";
 import { MockProvider, SqliteTranslationMemory } from "@yaku/core";
 
 describe("mcp translate tool handler", () => {
@@ -37,6 +37,21 @@ describe("mcp translate tool handler", () => {
     const out = await handler({ targetLang: "ja" });
     expect(out.content[0]!.text).toBe("ok");
     expect(await tm.lookupExact("Hi", "en", "ja")).toBeNull();
+  });
+
+  it("tm_lookup handler returns a stored entry", async () => {
+    const tm = new SqliteTranslationMemory(":memory:");
+    await tm.upsert({ sourceText: "Hi", sourceLang: "en", targetLang: "ja", translatedText: "やあ", sourceHash: "h" });
+    const handler = makeLookupHandler({ provider: new MockProvider({}), tm });
+    const out = await handler({ sourceText: "Hi", sourceLang: "en", targetLang: "ja" });
+    const entry = JSON.parse(out.content[0]!.text);
+    expect(entry.translatedText).toBe("やあ");
+  });
+  it("tm_lookup handler returns null for a miss", async () => {
+    const tm = new SqliteTranslationMemory(":memory:");
+    const handler = makeLookupHandler({ provider: new MockProvider({}), tm });
+    const out = await handler({ sourceText: "Nope", sourceLang: "en", targetLang: "ja" });
+    expect(JSON.parse(out.content[0]!.text)).toBeNull();
   });
 
   it("createMcpServer instantiates without throwing", () => {

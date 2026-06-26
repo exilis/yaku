@@ -17,4 +17,9 @@ describe("withRetry", () => {
     await expect(withRetry(fn, { retries: 2, baseDelayMs: 1 })).rejects.toThrow("boom");
     expect(fn).toHaveBeenCalledTimes(3); // initial + 2 retries
   });
+  it("treats negative retries as zero (one attempt, throws real error)", async () => {
+    const fn = vi.fn().mockRejectedValue(new Error("boom"));
+    await expect(withRetry(fn, { retries: -5, baseDelayMs: 1 })).rejects.toThrow("boom");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
 });

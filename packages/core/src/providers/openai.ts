@@ -50,6 +50,6 @@ export class OpenAIProvider implements LLMProvider {
         lastErr = err;
       }
     }
-    throw new Error(`OpenAIProvider: failed to parse response into schema: ${String(lastErr)}`);
+    throw new Error(`OpenAIProvider: failed to parse response into schema: ${String(lastErr)}`, { cause: lastErr });
   }
 }

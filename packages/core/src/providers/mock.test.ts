@@ -25,4 +25,22 @@ describe("MockProvider", () => {
       p.complete({ role: "translator", system: "", prompt: "", schema, model: "m" })
     ).rejects.toThrow(/no scripted/i);
   });
+  it("keeps independent FIFO queues per role", async () => {
+    const p = new MockProvider({
+      translator: [{ translations: { s: "t" } }],
+      reviewer: [{ passed: true }],
+    });
+    const tSchema = z.object({ translations: z.record(z.string(), z.string()) });
+    const rSchema = z.object({ passed: z.boolean() });
+    const r = await p.complete({ role: "reviewer", system: "", prompt: "", schema: rSchema, model: "m" });
+    const t = await p.complete({ role: "translator", system: "", prompt: "", schema: tSchema, model: "m" });
+    expect(r.value.passed).toBe(true);
+    expect(t.value.translations.s).toBe("t");
+    expect(p.calls.map((c) => c.role)).toEqual(["reviewer", "translator"]);
+  });
+  it("throws when a scripted response fails the demanded schema", async () => {
+    const p = new MockProvider({ translator: [{ wrong: 1 }] });
+    const schema = z.object({ translations: z.record(z.string(), z.string()) });
+    await expect(p.complete({ role: "translator", system: "", prompt: "", schema, model: "m" })).rejects.toThrow();
+  });
 });

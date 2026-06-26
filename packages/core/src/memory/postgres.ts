@@ -3,7 +3,10 @@ import type { TranslationMemory, TMEntry, TMMatch, FuzzyOptions } from "./types.
 import type { EmbeddingProvider } from "../providers/types.js";
 import { trigramSimilarity } from "./fuzzy.js";
 
-const NS = (ns?: string) => ns ?? "__global__";
+// Sentinel for the "no namespace" bucket. Uses a NUL prefix so it can never
+// collide with a user-supplied namespace string.
+const GLOBAL_NS = "\u0000global";
+const NS = (ns?: string) => ns ?? GLOBAL_NS;
 
 export interface PostgresTMOptions {
   pool: Pool;
@@ -44,17 +47,21 @@ export class PostgresTranslationMemory implements TranslationMemory {
     if ((opts.strategy === "semantic" || opts.strategy === "both") && this.opts.embeddingProvider) {
       const { vectors } = await this.opts.embeddingProvider.embed([sourceText], this.opts.embeddingModel ?? "text-embedding-3-small");
       const vec = `[${vectors[0]!.join(",")}]`;
-      const res = await this.opts.pool.query(
-        `SELECT *, 1 - (embedding <=> $5::vector) AS score
+      const params: unknown[] = [NS(namespace), sourceLang, targetLang, opts.threshold, vec];
+      let sql = `SELECT *, 1 - (embedding <=> $5::vector) AS score
          FROM tm WHERE namespace=$1 AND source_lang=$2 AND target_lang=$3 AND embedding IS NOT NULL
          AND 1 - (embedding <=> $5::vector) >= $4
-         ORDER BY score DESC LIMIT $6`,
-        [NS(namespace), sourceLang, targetLang, opts.threshold, vec, opts.limit ?? 5]
-      );
+         ORDER BY score DESC`;
+      if (opts.limit !== undefined) {
+        params.push(opts.limit);
+        sql += ` LIMIT $6`;
+      }
+      const res = await this.opts.pool.query(sql, params);
       return res.rows.map((r) => ({ entry: rowToEntry(r), score: Number(r.score) }));
     }
 
     if (opts.strategy === "lexical" || opts.strategy === "both") {
+      // v1: loads candidate rows for (namespace, langs) and ranks in JS. O(rows) per query; acceptable for moderate TM sizes, revisit with an index/ANN for scale.
       const res = await this.opts.pool.query(
         `SELECT * FROM tm WHERE namespace=$1 AND source_lang=$2 AND target_lang=$3`,
         [NS(namespace), sourceLang, targetLang]
@@ -103,6 +110,6 @@ function rowToEntry(row: any): TMEntry {
     targetLang: row.target_lang,
     translatedText: row.translated_text,
     sourceHash: row.source_hash,
-    namespace: row.namespace === "__global__" ? undefined : row.namespace,
+    namespace: row.namespace === GLOBAL_NS ? undefined : row.namespace,
   };
 }

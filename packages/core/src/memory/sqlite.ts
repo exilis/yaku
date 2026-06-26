@@ -2,7 +2,10 @@ import Database from "better-sqlite3";
 import type { TranslationMemory, TMEntry, TMMatch, FuzzyOptions } from "./types.js";
 import { trigramSimilarity } from "./fuzzy.js";
 
-const NS = (ns?: string) => ns ?? "__global__";
+// Sentinel for the "no namespace" bucket. Uses a NUL prefix so it can never
+// collide with a user-supplied namespace string.
+const GLOBAL_NS = "\u0000global";
+const NS = (ns?: string) => ns ?? GLOBAL_NS;
 
 export class SqliteTranslationMemory implements TranslationMemory {
   private db: Database.Database;
@@ -31,6 +34,7 @@ export class SqliteTranslationMemory implements TranslationMemory {
 
   async lookupFuzzy(sourceText: string, sourceLang: string, targetLang: string, opts: FuzzyOptions, namespace?: string): Promise<TMMatch[]> {
     if (opts.strategy === "off" || opts.strategy === "semantic") return [];
+    // v1: loads candidate rows for (namespace, langs) and ranks in JS. O(rows) per query; acceptable for moderate TM sizes, revisit with an index/ANN for scale.
     const rows = this.db
       .prepare(`SELECT * FROM tm WHERE namespace=? AND source_lang=? AND target_lang=?`)
       .all(NS(namespace), sourceLang, targetLang) as any[];
@@ -72,6 +76,6 @@ function rowToEntry(row: any): TMEntry {
     targetLang: row.target_lang,
     translatedText: row.translated_text,
     sourceHash: row.source_hash,
-    namespace: row.namespace === "__global__" ? undefined : row.namespace,
+    namespace: row.namespace === GLOBAL_NS ? undefined : row.namespace,
   };
 }

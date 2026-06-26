@@ -104,8 +104,8 @@ describe("runGroupLoop", () => {
       },
       backTranslation: { enabled: true, driftThreshold: 0.2 },
     });
-    const g = { groupKey: "g", sourceLang: "en", targetLang: "ja", glossary: [], segments: [{ id: "s1", text: "Hello world friend" }] } as const;
-    const r = await runGroupLoop(g as any, { provider, tm, config: cfg2, cost: new CostTracker() });
+    const g = { groupKey: "g", sourceLang: "en", targetLang: "ja", glossary: [], segments: [{ id: "s1", text: "Hello world friend" }] } satisfies AssembledGroup;
+    const r = await runGroupLoop(g, { provider, tm, config: cfg2, cost: new CostTracker() });
     expect(r.stopReason).toBe("back-translation-ok");
     expect(r.results[0]!.translatedText).toBe("改訂稿");
   });
@@ -120,7 +120,7 @@ describe("runGroupLoop", () => {
     const g = { groupKey: "g", sourceLang: "en", targetLang: "ja", glossary: [], segments: [
       { id: "old", text: "Reused source here" },
       { id: "fresh", text: "A fresh new line" },
-    ] } as any;
+    ] } satisfies AssembledGroup;
     const r = await runGroupLoop(g, { provider, tm, config: cfg, cost: new CostTracker() });
     const byId = Object.fromEntries(r.results.map((x) => [x.id, x]));
     expect(byId.old!.status).toBe("reused");

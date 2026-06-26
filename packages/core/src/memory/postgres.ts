@@ -8,6 +8,16 @@ import { trigramSimilarity } from "./fuzzy.js";
 const GLOBAL_NS = "\u0000global";
 const NS = (ns?: string) => ns ?? GLOBAL_NS;
 
+// Shape of a row in the `tm` table.
+interface TMRow {
+  namespace: string;
+  source_lang: string;
+  target_lang: string;
+  source_text: string;
+  translated_text: string;
+  source_hash: string;
+}
+
 export interface PostgresTMOptions {
   pool: Pool;
   embeddingProvider?: EmbeddingProvider | null;
@@ -103,7 +113,7 @@ export class PostgresTranslationMemory implements TranslationMemory {
   }
 }
 
-function rowToEntry(row: any): TMEntry {
+function rowToEntry(row: TMRow): TMEntry {
   return {
     sourceText: row.source_text,
     sourceLang: row.source_lang,

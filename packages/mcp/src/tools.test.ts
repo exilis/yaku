@@ -24,6 +24,9 @@ describe("mcp translate tool handler", () => {
   it("rejects invalid input", async () => {
     const deps = { provider: new MockProvider({}), tm: new SqliteTranslationMemory(":memory:") };
     const handler = makeTranslateHandler(deps);
+    // Deliberately malformed input (empty targetLangs/segments) to exercise the
+    // handler's validation path; the cast reaches runtime validation past the types.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await expect(handler({ sourceLang: "en", targetLangs: [], document: { segments: [] } } as any)).rejects.toThrow();
   });
 

@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
+import type OpenAI from "openai";
 import { OpenAIProvider } from "./openai.js";
+
+// Minimal fake OpenAI client: we only stub `chat.completions.create`, so cast
+// through `unknown` to the narrow `Pick<OpenAI, "chat">` the provider accepts.
+type FakeClient = Pick<OpenAI, "chat">;
 
 const schema = z.object({ translations: z.record(z.string(), z.string()) });
 
@@ -16,7 +21,7 @@ describe("OpenAIProvider", () => {
         },
       },
     };
-    const p = new OpenAIProvider({ client: fakeClient as any });
+    const p = new OpenAIProvider({ client: fakeClient as unknown as FakeClient });
     const r = await p.complete({ role: "translator", system: "sys", prompt: "p", schema, model: "gpt-4o" });
     expect(r.value.translations.s1).toBe("やあ");
     expect(r.usage.inputTokens).toBe(12);
@@ -34,7 +39,7 @@ describe("OpenAIProvider", () => {
         },
       },
     };
-    const p = new OpenAIProvider({ client: fakeClient as any, parseRetries: 1 });
+    const p = new OpenAIProvider({ client: fakeClient as unknown as FakeClient, parseRetries: 1 });
     await expect(
       p.complete({ role: "translator", system: "sys", prompt: "p", schema, model: "gpt-4o" })
     ).rejects.toThrow();
@@ -48,7 +53,7 @@ describe("OpenAIProvider", () => {
         usage: { prompt_tokens: 1, completion_tokens: 1 },
       });
     const fakeClient = { chat: { completions: { create } } };
-    const p = new OpenAIProvider({ client: fakeClient as any });
+    const p = new OpenAIProvider({ client: fakeClient as unknown as FakeClient });
     const r = await p.complete({ role: "translator", system: "s", prompt: "p", schema, model: "gpt-4o" });
     expect(r.value.translations.s1).toBe("ok");
     expect(create).toHaveBeenCalledTimes(2); // failed once, retried, succeeded
@@ -59,7 +64,7 @@ describe("OpenAIProvider", () => {
       .mockResolvedValueOnce({ choices: [{ message: { content: "not json" } }], usage: { prompt_tokens: 1, completion_tokens: 1 } })
       .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ translations: { s1: "fixed" } }) } }], usage: { prompt_tokens: 2, completion_tokens: 2 } });
     const fakeClient = { chat: { completions: { create } } };
-    const p = new OpenAIProvider({ client: fakeClient as any, parseRetries: 1 });
+    const p = new OpenAIProvider({ client: fakeClient as unknown as FakeClient, parseRetries: 1 });
     const r = await p.complete({ role: "translator", system: "s", prompt: "p", schema, model: "gpt-4o" });
     expect(r.value.translations.s1).toBe("fixed");
     expect(create).toHaveBeenCalledTimes(2);
@@ -72,7 +77,7 @@ describe("OpenAIProvider", () => {
       usage: { prompt_tokens: 1, completion_tokens: 1 },
     });
     const fakeClient = { chat: { completions: { create } } };
-    const p = new OpenAIProvider({ client: fakeClient as any, parseRetries: 1 });
+    const p = new OpenAIProvider({ client: fakeClient as unknown as FakeClient, parseRetries: 1 });
     await expect(p.complete({ role: "translator", system: "s", prompt: "p", schema, model: "gpt-4o" })).rejects.toThrow();
     expect(create).toHaveBeenCalledTimes(2); // initial + 1 parse retry
   });

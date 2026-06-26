@@ -19,7 +19,7 @@ const req: TranslationRequest = {
     { id: "body", text: "This is the body text", metadata: { group: "g", order: 1 } },
     { id: "brand", text: "Acme", metadata: { doNotTranslate: true } },
   ] },
-  config: { tm: { enabled: false, fuzzy: "off", fuzzyThreshold: 0.85 }, models: { translator: { provider: "mock", model: "m" }, reviewer: { provider: "mock", model: "m" } } } as any,
+  config: { tm: { enabled: false, fuzzy: "off", fuzzyThreshold: 0.85 }, models: { translator: { provider: "mock", model: "m" }, reviewer: { provider: "mock", model: "m" } } } satisfies TranslationRequest["config"],
 };
 
 describe("end-to-end contract", () => {

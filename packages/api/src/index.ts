@@ -17,6 +17,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const app = createServer();
   const port = Number(process.env.PORT ?? 3000);
   serve({ fetch: app.fetch, port });
-  // eslint-disable-next-line no-console
   console.log(`yaku API listening on :${port}`);
 }

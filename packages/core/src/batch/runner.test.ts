@@ -8,7 +8,7 @@ function makeReq(id: string, text: string): TranslationRequest {
   return {
     sourceLang: "en", targetLangs: ["ja"],
     document: { id, segments: [{ id: "t", text }] },
-    config: { tm: { enabled: false, fuzzy: "off", fuzzyThreshold: 0.85 }, models: { translator: { provider: "mock", model: "m" }, reviewer: { provider: "mock", model: "m" } } } as any,
+    config: { tm: { enabled: false, fuzzy: "off", fuzzyThreshold: 0.85 }, models: { translator: { provider: "mock", model: "m" }, reviewer: { provider: "mock", model: "m" } } } satisfies TranslationRequest["config"],
   };
 }
 

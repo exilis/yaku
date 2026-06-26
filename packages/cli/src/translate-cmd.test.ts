@@ -20,6 +20,9 @@ describe("runTranslate", () => {
   it("rejects an invalid request with a validation error", async () => {
     const provider = new MockProvider({});
     const tm = new SqliteTranslationMemory(":memory:");
+    // Deliberately malformed request (empty targetLangs/segments) to exercise the
+    // validation path; the cast bypasses the compile-time type to reach runtime validation.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await expect(runTranslate({ sourceLang: "en", targetLangs: [], document: { segments: [] } } as any, { provider, tm })).rejects.toThrow();
   });
 });

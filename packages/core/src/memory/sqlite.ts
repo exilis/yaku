@@ -7,6 +7,16 @@ import { trigramSimilarity } from "./fuzzy.js";
 const GLOBAL_NS = "\u0000global";
 const NS = (ns?: string) => ns ?? GLOBAL_NS;
 
+// Shape of a row in the `tm` table.
+interface TMRow {
+  namespace: string;
+  source_lang: string;
+  target_lang: string;
+  source_text: string;
+  translated_text: string;
+  source_hash: string;
+}
+
 export class SqliteTranslationMemory implements TranslationMemory {
   private db: Database.Database;
 
@@ -28,7 +38,7 @@ export class SqliteTranslationMemory implements TranslationMemory {
   async lookupExact(sourceText: string, sourceLang: string, targetLang: string, namespace?: string): Promise<TMEntry | null> {
     const row = this.db
       .prepare(`SELECT * FROM tm WHERE namespace=? AND source_lang=? AND target_lang=? AND source_text=?`)
-      .get(NS(namespace), sourceLang, targetLang, sourceText) as any;
+      .get(NS(namespace), sourceLang, targetLang, sourceText) as TMRow | undefined;
     return row ? rowToEntry(row) : null;
   }
 
@@ -37,7 +47,7 @@ export class SqliteTranslationMemory implements TranslationMemory {
     // v1: loads candidate rows for (namespace, langs) and ranks in JS. O(rows) per query; acceptable for moderate TM sizes, revisit with an index/ANN for scale.
     const rows = this.db
       .prepare(`SELECT * FROM tm WHERE namespace=? AND source_lang=? AND target_lang=?`)
-      .all(NS(namespace), sourceLang, targetLang) as any[];
+      .all(NS(namespace), sourceLang, targetLang) as TMRow[];
     const matches: TMMatch[] = [];
     for (const row of rows) {
       const score = trigramSimilarity(sourceText, row.source_text);
@@ -69,12 +79,12 @@ export class SqliteTranslationMemory implements TranslationMemory {
   }
 
   async exportAll(): Promise<TMEntry[]> {
-    const rows = this.db.prepare(`SELECT * FROM tm`).all() as any[];
+    const rows = this.db.prepare(`SELECT * FROM tm`).all() as TMRow[];
     return rows.map((r) => rowToEntry(r));
   }
 }
 
-function rowToEntry(row: any): TMEntry {
+function rowToEntry(row: TMRow): TMEntry {
   return {
     sourceText: row.source_text,
     sourceLang: row.source_lang,

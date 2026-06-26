@@ -67,6 +67,11 @@ export class SqliteTranslationMemory implements TranslationMemory {
     const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
     this.db.prepare(`DELETE FROM tm ${where}`).run(...params);
   }
+
+  async exportAll(): Promise<TMEntry[]> {
+    const rows = this.db.prepare(`SELECT * FROM tm`).all() as any[];
+    return rows.map((r) => rowToEntry(r));
+  }
 }
 
 function rowToEntry(row: any): TMEntry {

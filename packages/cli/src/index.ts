@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { Command } from "commander";
 import { createProvider, createTranslationMemory, type TranslateDeps } from "@yaku/core";
 import { runTranslate } from "./translate-cmd.js";
+import { tmInvalidate, tmExport, tmImport } from "./tm-cmd.js";
 
 const program = new Command();
 program.name("yaku").description("Agentic translation engine").version("0.1.0");
@@ -30,6 +31,34 @@ program
     else process.stdout.write(out + "\n");
 
     process.exit(res.status === "ok" ? 0 : res.status === "partial" ? 1 : 2);
+  });
+
+const tmCmd = program.command("tm").description("Manage translation memory");
+tmCmd
+  .command("invalidate")
+  .option("--tm <path>", "SQLite TM path", ":memory:")
+  .option("--source <lang>")
+  .option("--target <lang>")
+  .option("--namespace <ns>")
+  .action(async (o) => {
+    const tm = createTranslationMemory({ backend: "sqlite", path: o.tm });
+    await tmInvalidate(tm, { sourceLang: o.source, targetLang: o.target, namespace: o.namespace });
+  });
+tmCmd
+  .command("export")
+  .option("--tm <path>", "SQLite TM path", ":memory:")
+  .action(async (o) => {
+    const tm = createTranslationMemory({ backend: "sqlite", path: o.tm });
+    process.stdout.write(JSON.stringify(await tmExport(tm), null, 2) + "\n");
+  });
+tmCmd
+  .command("import")
+  .requiredOption("--tm <path>", "SQLite TM path")
+  .option("--in <file>", "entries JSON file (default stdin)")
+  .action(async (o) => {
+    const raw = o.in ? readFileSync(o.in, "utf8") : readFileSync(0, "utf8");
+    const tm = createTranslationMemory({ backend: "sqlite", path: o.tm });
+    await tmImport(tm, JSON.parse(raw));
   });
 
 program.parseAsync(process.argv);

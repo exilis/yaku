@@ -29,11 +29,14 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Typecheck
-        run: pnpm typecheck
-
+      # Build first: @yaku/cli, @yaku/api and @yaku/mcp resolve @yaku/core via
+      # its emitted dist/*.d.ts, so the package must be built before the
+      # dependent packages can typecheck in a clean checkout.
       - name: Build
         run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
 
       - name: Test
         run: pnpm test

@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { createProvider, createTranslationMemory, type TranslateDeps } from "@yaku/core";
 import { runTranslate } from "./translate-cmd.js";
 import { tmInvalidate, tmExport, tmImport } from "./tm-cmd.js";
+import { statusToExitCode } from "./exit-code.js";
 
 const program = new Command();
 program.name("yaku").description("Agentic translation engine").version("0.1.0");
@@ -30,7 +31,7 @@ program
     if (opts.out) writeFileSync(opts.out, out);
     else process.stdout.write(out + "\n");
 
-    process.exit(res.status === "ok" ? 0 : res.status === "partial" ? 1 : 2);
+    process.exit(statusToExitCode(res.status));
   });
 
 const tmCmd = program.command("tm").description("Manage translation memory");
@@ -61,4 +62,7 @@ tmCmd
     await tmImport(tm, JSON.parse(raw));
   });
 
-program.parseAsync(process.argv);
+program.parseAsync(process.argv).catch((err) => {
+  process.stderr.write(`yaku: ${err instanceof Error ? err.message : String(err)}\n`);
+  process.exit(2);
+});

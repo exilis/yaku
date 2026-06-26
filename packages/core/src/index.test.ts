@@ -9,6 +9,10 @@ describe("core public API", () => {
     const p = createProvider({ provider: "openai", apiKey: "test" });
     expect(p.name).toBe("openai");
   });
+  it("createProvider builds a mock provider", () => {
+    const p = createProvider({ provider: "mock" });
+    expect(p.name).toBe("mock");
+  });
   it("createTranslationMemory builds a sqlite memory", () => {
     const m = createTranslationMemory({ backend: "sqlite", path: ":memory:" });
     expect(m).toBeDefined();

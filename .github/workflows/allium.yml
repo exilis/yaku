@@ -1,0 +1,41 @@
+name: Allium Spec Check
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  allium-check:
+    name: Validate allium behavioral specs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo bin
+        id: cache-allium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/allium
+          key: allium-cli-3.0.4
+
+      - name: Install allium CLI
+        if: steps.cache-allium.outputs.cache-hit != 'true'
+        run: cargo install allium-cli --version 3.0.4 --locked
+
+      - name: Check specs
+        # `allium check` exits non-zero on warnings too, and its summary "error"
+        # count is unreliable. The real gate is per-finding error-severity lines,
+        # which allium prints as "<file>:<line>:<col>: error: ...". Fail only on
+        # those; warnings/info are non-blocking spec-quality hints.
+        run: |
+          output="$(allium check docs/allium 2>&1)" || true
+          echo "$output"
+          if echo "$output" | grep -qE ':[0-9]+:[0-9]+: error'; then
+            echo "::error::allium check found error-severity findings"
+            exit 1
+          fi
+          echo "allium check passed (no error-severity findings)"

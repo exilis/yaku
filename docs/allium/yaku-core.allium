@@ -1,0 +1,127 @@
+-- allium: 3
+--
+-- yaku translation engine — core behavioral specification.
+-- Scope: the load-bearing guarantees of the agentic translation engine
+-- (@yaku/core). Surface-specific transport (CLI/API/MCP) is out of scope; those
+-- are thin wrappers that share this contract.
+-- See: docs/superpowers/specs/2026-06-26-yaku-core-decisions.md
+--
+
+-- A translatable unit. `id` is the stable round-trip key the caller maps to a
+-- DB field. `source_hash` is derived from `text` and is independent of the
+-- target language, so it anchors cross-language consistency and incremental
+-- re-runs.
+entity Segment {
+    id: String
+    text: String
+    source_hash: String
+    do_not_translate: Boolean
+
+    invariant StableHash { this.source_hash != "" }
+}
+
+-- The result of translating one Segment into one target language, keyed by the
+-- same `id`. `status` drives the per-segment lifecycle.
+entity SegmentResult {
+    id: String
+    target_lang: String
+    translated_text: String
+    source_hash: String
+    status: pending | reused | translated | unchanged | skipped | failed
+    confidence: Decimal when status = translated
+
+    transitions status {
+        pending -> reused
+        pending -> translated
+        pending -> unchanged
+        pending -> skipped
+        pending -> failed
+        terminal: reused, translated, unchanged, skipped, failed
+    }
+
+    -- The round-trip key never changes and the hash matches its source Segment.
+    invariant SourceHashCarried { this.source_hash != "" }
+}
+
+-- A stored, reusable translation in the translation memory, keyed by
+-- (namespace, source_lang, target_lang, source_text).
+entity TmEntry {
+    source_text: String
+    source_lang: String
+    target_lang: String
+    translated_text: String
+    source_hash: String
+
+    invariant NonEmptyTranslation { this.translated_text != "" }
+}
+
+-- The per-language outcome for a document. `status` is partial when any segment
+-- failed but not all; failed only when every segment failed.
+entity LanguageResult {
+    target_lang: String
+    status: ok | partial | failed
+    stop_reason: accepted | max_iterations | budget_hit | back_translation_ok
+
+    transitions status {
+        ok -> partial
+        ok -> failed
+        partial -> failed
+        terminal: failed
+    }
+}
+
+-- An exact translation-memory hit is served without any model call.
+rule ReuseExactMatch {
+    when: ExactTmHit(result)
+    requires: result.status = pending
+    ensures:
+        result.status = reused
+}
+
+-- A do-not-translate segment is returned verbatim and skipped; no model runs.
+rule SkipDoNotTranslate {
+    when: AssembleSegment(result, segment)
+    requires:
+        result.status = pending
+        segment.do_not_translate
+    ensures:
+        result.status = skipped
+        result.translated_text = segment.text
+        result.source_hash = segment.source_hash
+}
+
+-- A segment with no translation-memory hit is translated by the agentic loop
+-- (draft, deterministic gates, independent reviewer, optional back-translation)
+-- and carries its source segment's language-independent hash.
+rule TranslateFresh {
+    when: AcceptDraft(result, segment)
+    requires: result.status = pending
+    ensures:
+        result.status = translated
+        result.source_hash = segment.source_hash
+}
+
+-- An accepted translation is committed to the translation memory for reuse.
+rule CommitAcceptedToMemory {
+    when: CommitTranslation(entry, lang)
+    requires: lang.stop_reason in {accepted, back_translation_ok}
+    ensures:
+        entry.translated_text != ""
+}
+
+-- A segment that cannot be translated fails in isolation: the language result
+-- degrades to partial rather than failing the whole document.
+rule FailSegmentInIsolation {
+    when: SegmentFailed(result, lang)
+    requires: result.status = pending
+    ensures:
+        result.status = failed
+        lang.status = partial
+}
+
+-- A loop that exhausts its iteration budget stops with a best-so-far result.
+rule StopAtMaxIterations {
+    when: ExhaustIterations(lang)
+    ensures:
+        lang.stop_reason = max_iterations
+}

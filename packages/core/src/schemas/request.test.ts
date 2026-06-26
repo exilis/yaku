@@ -39,4 +39,28 @@ describe("TranslationRequestSchema", () => {
     });
     expect(r.success).toBe(false);
   });
+
+  it("rejects an unknown top-level key", () => {
+    const r = TranslationRequestSchema.safeParse({
+      sourceLang: "en",
+      targetLang: "ja", // typo: should be targetLangs
+      targetLangs: ["ja"],
+      document: { segments: [{ id: "t", text: "Hi" }] },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a missing document", () => {
+    const r = TranslationRequestSchema.safeParse({ sourceLang: "en", targetLangs: ["ja"] });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects an empty sourceLang", () => {
+    const r = TranslationRequestSchema.safeParse({
+      sourceLang: "",
+      targetLangs: ["ja"],
+      document: { segments: [{ id: "t", text: "Hi" }] },
+    });
+    expect(r.success).toBe(false);
+  });
 });

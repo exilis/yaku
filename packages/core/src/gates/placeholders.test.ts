@@ -32,4 +32,9 @@ describe("placeholderGate", () => {
     const v = placeholderGate.check(group("%s left"), { translations: { s1: "残り" } });
     expect(v).toHaveLength(1);
   });
+
+  it("flags a dropped duplicate placeholder", () => {
+    const v = placeholderGate.check(group("%s and %s"), { translations: { s1: "%s だけ" } });
+    expect(v).toHaveLength(1); // source has two %s, translation has one
+  });
 });

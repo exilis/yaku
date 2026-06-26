@@ -1,7 +1,14 @@
 import type { Gate, GateViolation } from "./types.js";
 
-// Matches {{double}}, {single}, and printf-style %s %d %1$s
-const PLACEHOLDER_RE = /\{\{[^}]+\}\}|\{[^}]+\}|%(?:\d+\$)?[sdif]/g;
+// Matches {{double}}, {single}, and printf-style %s %d %1$s.
+// The {1,200} bound on the braces body is a guard against pathological input
+// (e.g. a long run of unclosed braces) that would otherwise cause quadratic
+// backtracking; 200 chars comfortably covers any realistic placeholder name.
+const PLACEHOLDER_RE = /\{\{[^}]{1,200}\}\}|\{[^}]{1,200}\}|%(?:\d+\$)?[sdif]/g;
+
+// Note: this gate flags MISSING placeholders only. Extra/hallucinated
+// placeholders in the translation are intentionally not flagged (per spec
+// "must survive") — only placeholders present in the source must be preserved.
 
 function extract(text: string): string[] {
   return (text.match(PLACEHOLDER_RE) ?? []).sort();

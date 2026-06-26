@@ -27,4 +27,10 @@ describe("glossaryGate", () => {
     const v = glossaryGate.check(g, { translations: { s1: "ログイン" } });
     expect(v).toHaveLength(0);
   });
+  it("honors caseSensitive for do-not-translate terms", () => {
+    const g = group("Use ACME now", [{ source: "ACME", caseSensitive: true }], "");
+    // translation lowercased the term -> with caseSensitive, this is a violation
+    const v = glossaryGate.check(g, { translations: { s1: "今すぐ acme を使う" } });
+    expect(v).toHaveLength(1);
+  });
 });

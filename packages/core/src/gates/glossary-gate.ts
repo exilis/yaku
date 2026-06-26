@@ -32,6 +32,10 @@ export const glossaryGate: Gate = {
   },
 };
 
+// Matching is substring-based (e.g. "cat" would match "category"). This is an
+// accepted v1 limitation suited to curated, multi-character terms. Word-boundary
+// matching is deferred because it doesn't generalize across CJK targets, where
+// there are no word boundaries to anchor on.
 function contains(haystack: string, needle: string, caseSensitive?: boolean): boolean {
   if (caseSensitive) return haystack.includes(needle);
   return haystack.toLowerCase().includes(needle.toLowerCase());

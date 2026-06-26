@@ -20,4 +20,10 @@ describe("lengthGate", () => {
   it("ignores segments without maxChars", () => {
     expect(lengthGate.check(group(undefined, ""), { translations: { s1: "very long text here" } })).toHaveLength(0);
   });
+  it("counts astral/emoji code points, not UTF-16 units", () => {
+    // "👍👍👍" is 3 code points but 6 UTF-16 units; with maxChars 3 it must PASS,
+    // and with maxChars 2 it must FAIL — proving code-point counting.
+    expect(lengthGate.check(group(3, ""), { translations: { s1: "👍👍👍" } })).toHaveLength(0);
+    expect(lengthGate.check(group(2, ""), { translations: { s1: "👍👍👍" } })).toHaveLength(1);
+  });
 });

@@ -19,9 +19,19 @@ export function makeTranslateHandler(deps: TranslateDeps) {
   };
 }
 
+/** Pure tm_invalidate handler — testable without the MCP transport. */
+export function makeInvalidateHandler(deps: TranslateDeps) {
+  return async (args: { sourceLang?: string; targetLang?: string; namespace?: string }): Promise<ToolContent> => {
+    await deps.tm.invalidate(args);
+    return { content: [{ type: "text", text: "ok" }] };
+  };
+}
+
 export function createMcpServer(deps: TranslateDeps): McpServer {
   const server = new McpServer({ name: "yaku", version: "0.1.0" });
   const handler = makeTranslateHandler(deps);
+  const invalidateHandler = makeInvalidateHandler(deps);
+  const optStr = TranslationRequestSchema.shape.sourceLang.optional();
 
   server.registerTool(
     "translate",
@@ -39,15 +49,12 @@ export function createMcpServer(deps: TranslateDeps): McpServer {
       title: "Invalidate translation memory",
       description: "Remove TM entries matching a filter.",
       inputSchema: {
-        sourceLang: TranslationRequestSchema.shape.sourceLang.optional(),
-        targetLang: TranslationRequestSchema.shape.sourceLang.optional(),
-        namespace: TranslationRequestSchema.shape.sourceLang.optional(),
+        sourceLang: optStr,
+        targetLang: optStr,
+        namespace: optStr,
       },
     },
-    async (args: { sourceLang?: string; targetLang?: string; namespace?: string }) => {
-      await deps.tm.invalidate(args);
-      return { content: [{ type: "text", text: "ok" }] };
-    }
+    async (args) => (await invalidateHandler(args)) as ToolContent & { [x: string]: unknown }
   );
 
   return server;

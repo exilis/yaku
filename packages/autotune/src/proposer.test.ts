@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { MockProvider, DEFAULT_TEMPLATES } from "@yaku/core";
-import { validateCandidate, propose, buildProposerPrompt, ProposalSchema } from "./proposer.js";
+import { validateCandidate, propose, buildProposerPrompt } from "./proposer.js";
 
 describe("validateCandidate", () => {
   it("accepts an allowed config knob change", () => {

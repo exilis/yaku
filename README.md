@@ -19,6 +19,9 @@ segment ids so the caller writes each piece back to its own field.
 - `@yaku/cli`  — `yaku translate` / `yaku tm` commands.
 - `@yaku/api`  — HTTP server: `POST /translate`, `GET /health`.
 - `@yaku/mcp`  — MCP server exposing `translate` + `tm_invalidate` tools.
+- `@yaku/autotune` — autonomous optimizer: tunes config knobs + prompt templates to
+  maximize quality (LLM-as-judge on a held-out gold set) while minimizing cost,
+  saving winners as versioned profiles.
 
 ## Install & build
 
@@ -60,6 +63,32 @@ curl -s localhost:3000/translate -H 'content-type: application/json' -d @request
 ```bash
 OPENAI_API_KEY=sk-... node packages/mcp/dist/index.js   # MCP server over stdio
 ```
+
+## Autotune (self-improving optimizer)
+
+`@yaku/autotune` runs an autonomous hill-climb that tunes engine config knobs and
+prompt templates to maximize translation quality (LLM-as-judge on a held-out gold
+set) while minimizing cost. Winners are saved as versioned profiles the engine
+can load.
+
+```bash
+# place TranslationRequest-shaped gold records under autotune/gold/*.json, then:
+OPENAI_API_KEY=$(cat .openai-api-key) \
+  node packages/autotune/dist/cli.js run \
+  --profile activities --floor 85 --max-iter 12 --budget 5 --sample 6 \
+  --langs ja,ko --judge-model gpt-4o --translator-model gpt-4o-mini
+
+node packages/autotune/dist/cli.js profiles          # show the active profile
+node packages/autotune/dist/cli.js show <runId>      # print a run report
+```
+
+Outputs: `autotune/profiles/<name>-v<N>.json` (winner), `autotune/profiles/active.json`
+(pointer), `autotune/ledger.jsonl` (append-only audit trail), `autotune/out/<runId>.md`
+(report). Use `--dry-run` to produce the profile + report without activating it.
+
+The judge model and gold set are fixed/independent of the search so the quality
+metric can't be gamed; during the search TM is disabled so the gold set is never
+memorized across candidates.
 
 ## Request / Response shape
 

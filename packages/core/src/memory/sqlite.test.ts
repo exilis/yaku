@@ -56,4 +56,8 @@ describe("SqliteTranslationMemory", () => {
     const limited = await m.lookupFuzzy("hello world!", "en", "ja", { threshold: 0, strategy: "lexical", limit: 1 });
     expect(limited).toHaveLength(1);
   });
+  it("close() releases the db handle without throwing", () => {
+    const tm = new SqliteTranslationMemory(":memory:");
+    expect(() => tm.close()).not.toThrow();
+  });
 });

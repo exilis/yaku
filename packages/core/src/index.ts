@@ -7,6 +7,8 @@ export * from "./schemas/index.js";
 export { translate } from "./orchestrator/translate.js";
 export type { TranslateDeps } from "./orchestrator/translate.js";
 export { translateBatch } from "./batch/runner.js";
+export { DEFAULT_TEMPLATES } from "./orchestrator/prompts.js";
+export type { PromptTemplates } from "./orchestrator/prompts.js";
 
 // Providers
 export type { LLMProvider, EmbeddingProvider, TokenUsage } from "./providers/types.js";

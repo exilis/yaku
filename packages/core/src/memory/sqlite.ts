@@ -82,6 +82,10 @@ export class SqliteTranslationMemory implements TranslationMemory {
     const rows = this.db.prepare(`SELECT * FROM tm`).all() as TMRow[];
     return rows.map((r) => rowToEntry(r));
   }
+
+  close(): void {
+    this.db.close();
+  }
 }
 
 function rowToEntry(row: TMRow): TMEntry {

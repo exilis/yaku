@@ -9,3 +9,6 @@ dist/
 .openai-api-key
 tmp/
 eval/out/
+
+# Isolated worktrees
+.worktrees/

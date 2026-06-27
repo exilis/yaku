@@ -5,6 +5,7 @@ import { SqliteTranslationMemory } from "../memory/sqlite.js";
 import { CostTracker } from "../cost/budget.js";
 import { resolveConfig } from "../schemas/index.js";
 import type { AssembledGroup } from "../gates/types.js";
+import { DEFAULT_TEMPLATES } from "./prompts.js";
 
 function group(text = "Hello world friend"): AssembledGroup {
   return { groupKey: "g", sourceLang: "en", targetLang: "ja", glossary: [], segments: [{ id: "s1", text }] };
@@ -191,5 +192,23 @@ describe("runGroupLoop", () => {
     expect(r.results[0]!.translatedText).toBe("こんにちは世界の友よ");
     // only ONE translator call (no extra revise pass)
     expect(provider.calls.filter((c) => c.role === "translator")).toHaveLength(1);
+  });
+
+  it("passes promptTemplates through to the translator prompt", async () => {
+    const provider = new MockProvider({
+      translator: [{ translations: { s1: "ようこそ" } }],
+      reviewer: [{ passed: true, confidence: { s1: 0.9 }, critique: "" }],
+    });
+    const tm = new SqliteTranslationMemory(":memory:");
+    const cfg = resolveConfig({
+      models: { translator: { provider: "mock", model: "m" }, reviewer: { provider: "mock", model: "m" } },
+      promptTemplates: {
+        ...DEFAULT_TEMPLATES,
+        translator: { ...DEFAULT_TEMPLATES.translator, instruction: "SENTINEL {targetLang}" },
+      },
+    });
+    await runGroupLoop(group(), { provider, tm, config: cfg, cost: new CostTracker() });
+    const translatorCall = provider.calls.find((c) => c.role === "translator");
+    expect(translatorCall?.prompt).toContain("SENTINEL ja");
   });
 });

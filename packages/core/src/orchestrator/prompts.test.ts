@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildTranslatorPrompt } from "./prompts.js";
+import { buildTranslatorPrompt, buildReviewerPrompt, buildBackTranslationPrompt, DEFAULT_TEMPLATES } from "./prompts.js";
 import { ReviewSchema } from "./reviewer.js";
 import type { AssembledGroup } from "../gates/types.js";
 
@@ -35,5 +35,40 @@ describe("ReviewSchema", () => {
   it("validates a reviewer verdict", () => {
     const r = ReviewSchema.safeParse({ passed: true, confidence: { title: 0.9 }, critique: "" });
     expect(r.success).toBe(true);
+  });
+});
+
+describe("prompt templates", () => {
+  it("DEFAULT_TEMPLATES reproduces the original translator wording", () => {
+    const p = buildTranslatorPrompt(group, {});
+    const pDefault = buildTranslatorPrompt(group, {}, DEFAULT_TEMPLATES);
+    expect(p).toBe(pDefault);
+  });
+
+  it("applies a translator instruction override with placeholders filled", () => {
+    const templates = {
+      ...DEFAULT_TEMPLATES,
+      translator: { ...DEFAULT_TEMPLATES.translator, instruction: "Render {sourceLang} into {targetLang} now." },
+    };
+    const p = buildTranslatorPrompt(group, {}, templates);
+    expect(p).toContain("Render en into ja now.");
+    expect(p).toContain("Welcome to Acme");
+  });
+
+  it("applies a reviewer instruction override", () => {
+    const draft = { title: "Acme へようこそ" };
+    const templates = {
+      ...DEFAULT_TEMPLATES,
+      reviewer: { ...DEFAULT_TEMPLATES.reviewer, instruction: "Audit {sourceLang}->{targetLang}." },
+    };
+    const p = buildReviewerPrompt(group, draft, templates);
+    expect(p).toContain("Audit en->ja.");
+    expect(p).toContain("Acme へようこそ");
+  });
+
+  it("back-translation default renders the target->source direction", () => {
+    const draft = { title: "Acme へようこそ" };
+    const p = buildBackTranslationPrompt(group, draft);
+    expect(p).toContain("Translate the following from ja back to en.");
   });
 });

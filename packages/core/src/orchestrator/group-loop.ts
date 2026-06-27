@@ -6,7 +6,7 @@ import { CostTracker } from "../cost/budget.js";
 import { runGates } from "../gates/index.js";
 import { sourceHash } from "../util/hash.js";
 import { TranslationDraftSchema, ReviewSchema } from "./reviewer.js";
-import { buildTranslatorPrompt, buildReviewerPrompt, buildBackTranslationPrompt } from "./prompts.js";
+import { buildTranslatorPrompt, buildReviewerPrompt, buildBackTranslationPrompt, type PromptTemplates } from "./prompts.js";
 import { semanticDrift } from "./back-translation.js";
 import { GroupTrace, type StopReason } from "../trace/trace.js";
 
@@ -39,6 +39,7 @@ export async function runGroupLoop(group: AssembledGroup, deps: GroupLoopDeps): 
 
   const trace = new GroupTrace(group.groupKey, group.targetLang);
   const ns = config.tm.namespace;
+  const templates = config.promptTemplates as PromptTemplates | undefined;
 
   // 1. TM LOOKUP
   const reused = new Map<string, { text: string; score: number }>();
@@ -82,7 +83,7 @@ export async function runGroupLoop(group: AssembledGroup, deps: GroupLoopDeps): 
       critique: iteration > 1 ? critique : undefined,
       gateViolations: iteration > 1 ? gateMsgs : undefined,
       suggestions,
-    });
+    }, templates);
     const draftRes = await provider.complete({
       role: "translator", system: "You are a professional translator.",
       prompt, schema: TranslationDraftSchema,
@@ -98,7 +99,7 @@ export async function runGroupLoop(group: AssembledGroup, deps: GroupLoopDeps): 
     if (config.reviewer.enabled) {
       const reviewRes = await provider.complete({
         role: "reviewer", system: "You are a translation reviewer.",
-        prompt: buildReviewerPrompt(llmGroup, draft), schema: ReviewSchema,
+        prompt: buildReviewerPrompt(llmGroup, draft, templates), schema: ReviewSchema,
         model: config.models.reviewer!.model, temperature: config.models.reviewer!.temperature,
       });
       cost.add(reviewRes.usage);
@@ -122,7 +123,7 @@ export async function runGroupLoop(group: AssembledGroup, deps: GroupLoopDeps): 
   if (config.backTranslation.enabled && stopReason === "accepted" && config.models.backTranslator) {
     const btRes = await provider.complete({
       role: "backTranslator", system: "You are a back-translation checker.",
-      prompt: buildBackTranslationPrompt(llmGroup, draft),
+      prompt: buildBackTranslationPrompt(llmGroup, draft, templates),
       schema: TranslationDraftSchema,
       model: config.models.backTranslator.model, temperature: config.models.backTranslator.temperature,
     });
@@ -133,7 +134,7 @@ export async function runGroupLoop(group: AssembledGroup, deps: GroupLoopDeps): 
       // One bounded extra revise pass focused on drifted segments.
       iteration++;
       critique = `Back-translation drift detected on: ${drifted.map((s) => s.id).join(", ")}. Improve fidelity.`;
-      const prompt = buildTranslatorPrompt(llmGroup, { critique, suggestions });
+      const prompt = buildTranslatorPrompt(llmGroup, { critique, suggestions }, templates);
       const revRes = await provider.complete({
         role: "translator", system: "You are a professional translator.",
         prompt, schema: TranslationDraftSchema,

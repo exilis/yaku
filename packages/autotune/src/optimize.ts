@@ -72,7 +72,18 @@ export async function optimize(args: OptimizeArgs): Promise<OptimizeResult> {
     if (spend + estimatedNext > args.budgetUsd) { stopReason = "budget"; break; }
 
     iterations++;
-    const metrics = await args.runCandidate(candidate);
+    let metrics: CandidateResult;
+    try {
+      metrics = await args.runCandidate(candidate);
+    } catch (err) {
+      // A throwing candidate (e.g. malformed nested config rejected by the engine
+      // schema) must never abort the run — treat it as an unscoreable rejection.
+      metrics = {
+        quality: 0, qualityMin: 0, estUsd: 0, gatePassRate: 0,
+        inputTokens: 0, outputTokens: 0, scored: 0, unscoreable: true,
+        critiques: [`candidate evaluation failed: ${String(err)}`],
+      };
+    }
     spend += metrics.estUsd;
 
     const better = isBetter(metrics, bestMetrics, args.objective);

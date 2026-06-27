@@ -84,4 +84,23 @@ describe("optimize", () => {
     expect(entries[0]).toEqual({ iter: 0, decision: "baseline", best: true });
     expect(entries[1]).toEqual({ iter: 1, decision: "accept", best: true });
   });
+
+  it("does not abort when a candidate evaluation throws (treats it as rejected)", async () => {
+    let calls = 0;
+    const out = await optimize({
+      baseline: { config: { maxIterations: 3 } },
+      objective: { floor: 85, epsilon: 0.0001 },
+      maxIter: 5, budgetUsd: 100, plateauK: 1,
+      propose: async () => ({ config: { maxIterations: 2 }, rationale: "x" }),
+      runCandidate: async (c) => {
+        calls++;
+        if (c.config.maxIterations === 3) return res(90, 0.20); // baseline ok
+        throw new Error("engine rejected malformed config");      // candidate throws
+      },
+    });
+    // The run completed (did not throw), kept the baseline, and stopped via plateau.
+    expect(out.best.config.maxIterations).toBe(3);
+    expect(out.stopReason).toBe("plateau");
+    expect(calls).toBeGreaterThanOrEqual(2); // baseline + at least one throwing candidate
+  });
 });

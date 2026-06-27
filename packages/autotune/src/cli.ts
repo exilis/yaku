@@ -41,6 +41,7 @@ program
     const provider = new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY });
     const tm = new SqliteTranslationMemory(":memory:");
 
+    try {
     const floor = Number(opts.floor);
     const sample = Number(opts.sample);
     const runId = `run-${new Date().toISOString().replace(/[:.]/g, "-")}`;
@@ -112,6 +113,9 @@ program
     writeFileSync(join(outDir, `${runId}.md`), report);
 
     console.log(report);
+    } finally {
+      tm.close?.();
+    }
   });
 
 program

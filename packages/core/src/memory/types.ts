@@ -23,4 +23,6 @@ export interface TranslationMemory {
   lookupFuzzy(sourceText: string, sourceLang: string, targetLang: string, opts: FuzzyOptions, namespace?: string): Promise<TMMatch[]>;
   upsert(entry: TMEntry): Promise<void>;
   invalidate(filter: { sourceLang?: string; targetLang?: string; namespace?: string }): Promise<void>;
+  /** Release any underlying resources (e.g. close the DB handle). Optional. */
+  close?(): void;
 }

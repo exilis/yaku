@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { PromptTemplates } from "../orchestrator/prompts.js";
 
 const ModelRefSchema = z
   .object({

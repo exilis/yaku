@@ -39,6 +39,18 @@ importers:
         specifier: ^4.6.0
         version: 4.12.27
 
+  packages/autotune:
+    dependencies:
+      '@yaku/core':
+        specifier: workspace:*
+        version: link:../core
+      commander:
+        specifier: ^12.1.0
+        version: 12.1.0
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+
   packages/cli:
     dependencies:
       '@yaku/core':

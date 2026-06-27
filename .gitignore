@@ -11,7 +11,8 @@ tmp/
 eval/out/
 
 # Autotune local run artifacts (generated gold set, profiles, ledger, reports)
-autotune/
+# Anchored to repo root so it does NOT match packages/autotune/ (the source).
+/autotune/
 
 # Isolated worktrees
 .worktrees/

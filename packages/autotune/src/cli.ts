@@ -51,13 +51,26 @@ program
     const applyLangs = (r: GoldRecord): GoldRecord => (langs ? { ...r, targetLangs: langs } : r);
     const iterationSample = sampleRecords(goldAll, sample, seed).map(applyLangs);
 
+    console.error(
+      `[autotune] ${runId}\n` +
+        `[autotune] gold=${goldAll.length} records, sample=${iterationSample.length}/iter, ` +
+        `langs=${(langs ?? ["(gold default)"]).join(",")}, floor=${floor}, ` +
+        `maxIter=${opts.maxIter}, budget=$${opts.budget}, judge=${opts.judgeModel}`
+    );
+    console.error(`[autotune] evaluating baseline (this can take a minute per record)...`);
+
     const active = readActiveProfile(opts.base);
     const baseline: Candidate = active
       ? { config: active.config, promptTemplates: active.promptTemplates as Candidate["promptTemplates"] }
       : { config: { models: { translator: { provider: "openai", model: opts.translatorModel }, reviewer: { provider: "openai", model: opts.translatorModel } } } };
 
-    const ledger = (e: LedgerIteration) =>
+    const ledger = (e: LedgerIteration) => {
       appendLedger(opts.base, { runId, ...e, candidate: { config: e.candidate.config, rationale: e.candidate.rationale } });
+      const tag = e.decision === "baseline" ? "baseline" : `iter ${e.iter} ${e.decision}`;
+      const q = e.metrics.unscoreable ? "unscoreable" : `q=${e.metrics.quality.toFixed(1)} (min ${e.metrics.qualityMin})`;
+      const why = e.candidate.rationale ? ` — ${e.candidate.rationale.slice(0, 80)}` : "";
+      console.error(`[autotune] ${tag}: ${q} $${e.metrics.estUsd.toFixed(4)} spend=$${e.spendSoFar.toFixed(4)}${why}`);
+    };
 
     const result = await optimize({
       baseline,
@@ -70,6 +83,10 @@ program
       onIteration: ledger,
     });
 
+    console.error(
+      `[autotune] search done (${result.stopReason}, ${result.iterations} iters, $${result.spendUsd.toFixed(4)}). ` +
+        `Validating winner on full gold set (${goldAll.length} records)...`
+    );
     const fullSet = goldAll.map(applyLangs);
     const finalMetrics = await runCandidate(result.best, fullSet, {
       provider, tm, judgeModel: opts.judgeModel, translatorModelForPricing: opts.translatorModel,

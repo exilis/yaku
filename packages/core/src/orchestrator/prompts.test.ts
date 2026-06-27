@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildTranslatorPrompt } from "./prompts.js";
+import { buildTranslatorPrompt, buildReviewerPrompt, buildBackTranslationPrompt, DEFAULT_TEMPLATES } from "./prompts.js";
 import { ReviewSchema } from "./reviewer.js";
 import type { AssembledGroup } from "../gates/types.js";
 
@@ -38,8 +38,6 @@ describe("ReviewSchema", () => {
   });
 });
 
-import { buildReviewerPrompt, buildBackTranslationPrompt, DEFAULT_TEMPLATES } from "./prompts.js";
-
 describe("prompt templates", () => {
   it("DEFAULT_TEMPLATES reproduces the original translator wording", () => {
     const p = buildTranslatorPrompt(group, {});
@@ -68,10 +66,9 @@ describe("prompt templates", () => {
     expect(p).toContain("Acme へようこそ");
   });
 
-  it("back-translation default still mentions both directions", () => {
+  it("back-translation default renders the target->source direction", () => {
     const draft = { title: "Acme へようこそ" };
     const p = buildBackTranslationPrompt(group, draft);
-    expect(p).toContain("ja");
-    expect(p).toContain("en");
+    expect(p).toContain("Translate the following from ja back to en.");
   });
 });

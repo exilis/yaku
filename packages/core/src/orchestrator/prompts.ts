@@ -1,8 +1,13 @@
 import type { AssembledGroup } from "../gates/types.js";
 
+/**
+ * Customizable prompt strings for the translator, reviewer, and back-translation steps.
+ * Any `instruction`/`jsonFormat` string may contain the `{sourceLang}` and `{targetLang}`
+ * placeholders, which are substituted with the group's languages at build time.
+ */
 export interface PromptTemplates {
   translator: {
-    instruction: string; // "{sourceLang}" / "{targetLang}" placeholders
+    instruction: string;
     jsonFormat: string;
     contextLabel: string;
     glossaryHeader: string;

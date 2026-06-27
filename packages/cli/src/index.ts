@@ -19,6 +19,7 @@ program
   .option("--trace <level>", "none|summary|full")
   .option("--source <lang>", "override source language")
   .option("--target <langs>", "override target languages (comma-separated)")
+  .option("--profile-base <dir>", "apply the active autotune profile from this dir as config defaults")
   .action(async (opts) => {
     const raw = opts.in ? readFileSync(opts.in, "utf8") : readFileSync(0, "utf8");
     const request = JSON.parse(raw);
@@ -26,11 +27,17 @@ program
     if (opts.source) request.sourceLang = opts.source;
     if (opts.target) request.targetLangs = String(opts.target).split(",").map((s: string) => s.trim()).filter(Boolean);
 
+    let finalRequest = request;
+    if (opts.profileBase) {
+      const { applyProfile } = await import("@yaku/autotune");
+      finalRequest = applyProfile(request, opts.profileBase);
+    }
+
     const deps: TranslateDeps = {
       provider: createProvider({ provider: opts.provider }),
       tm: createTranslationMemory({ backend: "sqlite", path: opts.tm }),
     };
-    const res = await runTranslate(request, deps);
+    const res = await runTranslate(finalRequest, deps);
     const out = JSON.stringify(res, null, 2);
     if (opts.out) writeFileSync(opts.out, out);
     else process.stdout.write(out + "\n");

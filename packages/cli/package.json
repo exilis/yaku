@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@yaku/autotune": "workspace:*",
     "@yaku/core": "workspace:*",
     "commander": "^12.1.0"
   }

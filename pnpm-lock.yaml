@@ -53,6 +53,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@yaku/autotune':
+        specifier: workspace:*
+        version: link:../autotune
       '@yaku/core':
         specifier: workspace:*
         version: link:../core

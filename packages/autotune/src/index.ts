@@ -13,3 +13,4 @@ export { ProfileSchema, writeProfile, readActiveProfile, setActive, appendLedger
 export type { Profile } from "./profile.js";
 export { optimize } from "./optimize.js";
 export type { OptimizeResult, StopReason, LedgerIteration } from "./optimize.js";
+export { applyProfile } from "./apply.js";

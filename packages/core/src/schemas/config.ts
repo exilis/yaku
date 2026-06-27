@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PromptTemplates } from "../orchestrator/prompts.js";
 
 const ModelRefSchema = z
   .object({
@@ -44,6 +45,11 @@ const BudgetObject = z
   })
   .strict();
 
+// Loose passthrough for prompt template overrides. Strict structural validation
+// is intentionally NOT done here; the autotune package validates templates
+// separately. The engine only needs to accept + carry them through config.
+const PromptTemplatesObject = z.record(z.string(), z.any()).optional();
+
 const baseShape = {
   maxIterations: z.number().int().positive().default(3),
   reviewer: ReviewerObject.default({}),
@@ -53,6 +59,7 @@ const baseShape = {
   budget: BudgetObject.default({}),
   concurrency: z.number().int().positive().default(8),
   trace: z.enum(["none", "summary", "full"]).default("none"),
+  promptTemplates: PromptTemplatesObject,
 };
 
 // Per-language overrides are *deeply* partial: every top-level key is optional,
@@ -72,6 +79,7 @@ const PartialConfigSchema = z
     budget: BudgetObject.partial(),
     concurrency: baseShape.concurrency,
     trace: baseShape.trace,
+    promptTemplates: PromptTemplatesObject,
   })
   .partial()
   .strict();

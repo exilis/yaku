@@ -25,7 +25,19 @@ export interface ValidationResult {
   reason?: string;
 }
 
+/** True iff v is a finite integer within [lo, hi] inclusive. */
+function inIntRange(v: unknown, [lo, hi]: [number, number]): boolean {
+  return typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi;
+}
+
 export function validateCandidate(candidate: Candidate): ValidationResult {
+  // This gate bounds the search space at the TOP level (allowed keys + numeric
+  // ranges) and guards the prompt JSON contract. Deeper structural validation of
+  // nested config (e.g. reviewer.enabled type, models shape) is delegated to the
+  // engine's strict TranslationConfigSchema, which throws on malformed config.
+  // Non-jsonFormat template fields (instruction/judgment) are intentionally
+  // unguarded: they affect quality, which the judge measures, not the JSON contract.
+
   // 1. config keys must all be in the allow-list
   for (const key of Object.keys(candidate.config)) {
     if (!ALLOWED_CONFIG_KEYS.has(key)) {
@@ -33,18 +45,14 @@ export function validateCandidate(candidate: Candidate): ValidationResult {
     }
   }
 
-  // 2. numeric knob ranges
+  // 2. numeric knob ranges (must be finite integers within bounds)
   const maxIter = candidate.config.maxIterations;
-  if (maxIter !== undefined) {
-    if (typeof maxIter !== "number" || maxIter < MAX_ITERATIONS_RANGE[0] || maxIter > MAX_ITERATIONS_RANGE[1]) {
-      return { ok: false, reason: `maxIterations out of range ${MAX_ITERATIONS_RANGE.join("-")}` };
-    }
+  if (maxIter !== undefined && !inIntRange(maxIter, MAX_ITERATIONS_RANGE)) {
+    return { ok: false, reason: `maxIterations must be an integer in ${MAX_ITERATIONS_RANGE.join("-")}` };
   }
   const concurrency = candidate.config.concurrency;
-  if (concurrency !== undefined) {
-    if (typeof concurrency !== "number" || concurrency < CONCURRENCY_RANGE[0] || concurrency > CONCURRENCY_RANGE[1]) {
-      return { ok: false, reason: `concurrency out of range ${CONCURRENCY_RANGE.join("-")}` };
-    }
+  if (concurrency !== undefined && !inIntRange(concurrency, CONCURRENCY_RANGE)) {
+    return { ok: false, reason: `concurrency must be an integer in ${CONCURRENCY_RANGE.join("-")}` };
   }
 
   // 3. prompt template JSON-contract guard

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { MockProvider, DEFAULT_TEMPLATES } from "@yaku/core";
-import { validateCandidate, propose, ProposalSchema } from "./proposer.js";
+import { validateCandidate, propose, buildProposerPrompt, ProposalSchema } from "./proposer.js";
 
 describe("validateCandidate", () => {
   it("accepts an allowed config knob change", () => {
@@ -16,6 +16,12 @@ describe("validateCandidate", () => {
   it("rejects maxIterations out of range", () => {
     const v = validateCandidate({ config: { maxIterations: 99 } });
     expect(v.ok).toBe(false);
+  });
+
+  it("rejects non-integer and non-finite maxIterations", () => {
+    expect(validateCandidate({ config: { maxIterations: 2.5 } }).ok).toBe(false);
+    expect(validateCandidate({ config: { maxIterations: Number.NaN } }).ok).toBe(false);
+    expect(validateCandidate({ config: { maxIterations: Number.POSITIVE_INFINITY } }).ok).toBe(false);
   });
 
   it("rejects a translator template that drops the translations JSON contract", () => {
@@ -83,5 +89,16 @@ describe("propose", () => {
       { provider, model: "gpt-4o", maxRetries: 2 }
     );
     expect(out).toBeNull();
+  });
+
+  it("includes the rejection reason in the retry prompt", () => {
+    const prompt = buildProposerPrompt(
+      { config: {} },
+      { quality: 90, qualityMin: 88, estUsd: 0.5, gatePassRate: 1, inputTokens: 0, outputTokens: 0, scored: 5, unscoreable: false, critiques: ["too literal on titles"] },
+      "maxIterations must be an integer in 1-6"
+    );
+    expect(prompt).toContain("rejected");
+    expect(prompt).toContain("maxIterations must be an integer in 1-6");
+    expect(prompt).toContain("too literal on titles"); // critiques are surfaced too
   });
 });

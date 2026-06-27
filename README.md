@@ -72,7 +72,9 @@ set) while minimizing cost. Winners are saved as versioned profiles the engine
 can load.
 
 ```bash
-# place TranslationRequest-shaped gold records under autotune/gold/*.json, then:
+# build a held-out gold set from the activities dataset (writes autotune/gold/*.json):
+node eval/build-gold.mjs --langs ja,ko --limit 5
+# (gold files are TranslationRequest-shaped, no config — autotune injects that), then:
 OPENAI_API_KEY=$(cat .openai-api-key) \
   node packages/autotune/dist/cli.js run \
   --profile activities --floor 85 --max-iter 12 --budget 5 --sample 6 \

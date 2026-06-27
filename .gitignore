@@ -4,3 +4,8 @@ dist/
 .env
 *.sqlite
 *.sqlite-journal
+
+# Secrets and local eval scratch — never commit
+.openai-api-key
+tmp/
+eval/out/

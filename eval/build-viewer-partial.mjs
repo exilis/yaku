@@ -74,7 +74,7 @@ for (const [id, langSet] of [...byRecord.entries()].sort()) {
 }
 
 // Totals: prefer report.totals; else compute from records.
-const totals = report?.totals ?? computeTotals(records, allLangs);
+const totals = report?.totals ?? computeTotals(records);
 
 const dataset = {
   generatedAt: new Date().toISOString(),
@@ -135,7 +135,7 @@ function synthMetrics(id, segCount, langs, log, fields) {
   return { id, title: fields[0]?.source.slice(0, 60) ?? "", segments: segCount, wallMs: log?.wallMs ?? 0, status: log?.status ?? "ok", roundTrip, perLanguage };
 }
 
-function computeTotals(records, langs) {
+function computeTotals(records) {
   const t = { records: records.length, languages: 0, segments: 0, translated: 0, reused: 0, skipped: 0, failed: 0, iterations: 0, inputTokens: 0, outputTokens: 0, wallMs: 0, estUsd: 0 };
   for (const r of records) {
     for (const p of r.metrics.perLanguage) {

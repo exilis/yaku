@@ -83,10 +83,8 @@ function walk(node, path, out, role, group) {
     return;
   }
   if (typeof node === "string" && node.trim()) {
-    const key = path.split(".").pop().replace(/\.\d+$/, "");
-    // numeric last segment means array element; look one up
-    const realKey = /^\d+$/.test(key) ? path.split(".").slice(-2)[0] : key;
-    const leafKey = isNaN(Number(realKey)) ? realKey : path.split(".").slice(-2)[0];
+    // The field key is the last non-numeric path segment (numeric segments are
+    // array indices, e.g. "...requirements.0.text" -> "text").
     const checkKey = path.split(".").filter((p) => !/^\d+$/.test(p)).pop();
     if (TRANSLATABLE_LEAF_KEYS.has(checkKey) || FORCE_INCLUDE_SUFFIX.some((s) => path.endsWith(s))) {
       out.push({ id: path, text: node, role: checkKey, group });

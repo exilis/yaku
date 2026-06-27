@@ -4,10 +4,17 @@
 **Status:** Design approved, ready for implementation planning
 **Scope:** A new `@yaku/autotune` package plus a minimal, backward-compatible
 change to `@yaku/core` that makes prompt templates overridable. Autotune runs an
-autonomous hill-climb loop that optimizes translation **quality**, **cost**, and
-**speed** by tuning engine config knobs and prompt template text, evaluating
-candidates against a held-out gold set with an LLM-as-judge, and persisting the
-winner as a versioned profile.
+autonomous hill-climb loop that optimizes translation **quality** and **cost** by
+tuning engine config knobs and prompt template text, evaluating candidates
+against a held-out gold set with an LLM-as-judge, and persisting the winner as a
+versioned profile.
+
+> **Note on speed:** latency is intentionally NOT an optimization objective.
+> Throughput is fundamentally an infrastructure/parallelization concern
+> (`concurrency`, batching, queues) rather than a property of the config + prompt
+> choices Autotune searches over. Optimizing for it would mostly duplicate the
+> cost signal (e.g. "disable the reviewer"). The objective is therefore a clean
+> two-dimensional tradeoff: **quality vs cost.**
 
 ---
 
@@ -16,15 +23,15 @@ winner as a versioned profile.
 Production translation needs more than a fixed pipeline — the best
 model/reviewer/prompt combination for a given corpus, language set, and budget
 is an empirical question. yaku already has a working agentic engine
-(`@yaku/core`) and an eval harness (`eval/`) that measures cost (tokens) and
-speed (latency) deterministically and surfaces quality via a human-facing
-viewer. **Autotune closes the loop:** it automatically proposes changes,
-measures whether they help, and keeps what is better.
+(`@yaku/core`) and an eval harness (`eval/`) that measures cost (tokens)
+deterministically and surfaces quality via a human-facing viewer. **Autotune
+closes the loop:** it automatically proposes changes, measures whether they help,
+and keeps what is better.
 
 The mechanism:
 
 > evaluate current best → LLM proposes a candidate → evaluate candidate on a
-> cheap sample → keep it if it clears the quality floor and lowers cost+speed →
+> cheap sample → keep it if it clears the quality floor and lowers cost →
 > repeat until capped/converged → validate the winner on the full gold set →
 > write a versioned profile + ledger entry.
 
@@ -86,7 +93,6 @@ is already built.
   runs `translate()` under that profile and collects:
   - **quality** (via the judge),
   - **cost** (tokens → USD),
-  - **speed** (wall ms per doc),
   - **structural gate pass-rate**.
 - Returns a `CandidateResult` metrics bundle. This is the one unit that spends
   money.
@@ -104,10 +110,10 @@ is already built.
 ### 2.5 Objective & selector (`objective.ts`)
 - Implements the lexicographic rule:
   1. `quality >= floor` (hard gate), then
-  2. minimize `cost + speedWeight * latency`.
-- `isBetter(candidate, best)` → boolean. `floor` and `speedWeight` are
-  configurable. Quality deltas below an epsilon are treated as "not better" to
-  avoid churning on floating-point noise.
+  2. minimize `cost` (USD).
+- `isBetter(candidate, best)` → boolean. `floor` is configurable. Cost deltas
+  below an epsilon are treated as "not better" to avoid churning on
+  floating-point noise.
 
 ### 2.6 Orchestrator (`optimize.ts`)
 - The hill-climb loop. Enforces the iteration cap, budget cap, and plateau
@@ -144,7 +150,7 @@ yaku-autotune run --profile activities --floor 85 --max-iter 12 --budget 5.00 \
    c. runner evaluates the candidate on the SAME seeded sample (fair compare)
       -> CandidateResult
    d. selector.isBetter(candidate, best)?
-        - quality >= floor AND (cost + w*latency) < best's -> ACCEPT:
+        - quality >= floor AND cost < best's -> ACCEPT:
           best := candidate, reset plateau counter
         - else -> REJECT, plateau counter++
    e. ledger.append(iteration n: candidate, metrics, decision, rationale, spend)
@@ -242,9 +248,9 @@ before any money is spent.
     "runId": "run-2026-06-27-...",
     "goldSet": "activities", "sample": 6, "langs": ["ja", "ko"],
     "judgeModel": "gpt-4o",           // pinned, for honest cross-version comparison
-    "objective": { "floor": 85, "speedWeight": 0.0 }
+    "objective": { "floor": 85 }
   },
-  "metrics": { "quality": 89.2, "estUsd": 0.41, "wallMsPerDoc": 4200, "gatePassRate": 1.0 }
+  "metrics": { "quality": 89.2, "estUsd": 0.41, "gatePassRate": 1.0 }
 }
 ```
 `autotune/profiles/active.json` is a tiny pointer recording the live profile
@@ -255,7 +261,7 @@ name+version. The engine loads it (or nothing) at startup.
 ```jsonc
 {"runId":"...","iter":4,"candidate":{"diff":"reviewer.enabled=false"},
  "rationale":"judge floor cleared at iter2 without reviewer; cutting cost",
- "metrics":{"quality":86.1,"estUsd":0.22,"wallMsPerDoc":2600},
+ "metrics":{"quality":86.1,"estUsd":0.22},
  "decision":"accept","spendSoFar":1.84,"best":true}
 ```
 Never rewritten — a full forensic record of every candidate, the proposer's
@@ -263,7 +269,7 @@ reasoning, and each accept/reject decision.
 
 ### Report — human-facing output
 `autotune/out/<runId>.md`:
-- Baseline vs winner table (quality / cost / speed / gate-pass, with % deltas).
+- Baseline vs winner table (quality / cost / gate-pass, with % deltas).
 - The accepted change-set with rationales (what actually moved the needle).
 - Rejected-but-interesting candidates (what was tried and didn't help).
 - Convergence note (hit cap / hit budget / plateaued) and total spend.
@@ -304,7 +310,7 @@ Profiles are versioned and immutable, so rollback is just repointing
 
 ### Testing strategy (unit tests with `MockProvider`, mirroring core)
 - `objective.test.ts` — lexicographic `isBetter`: floor-not-cleared loses
-  regardless of cheapness; equal quality → cost+speed tiebreak; epsilon handling.
+  regardless of cheapness; both clear floor → cheaper wins; epsilon handling.
 - `proposer.test.ts` — validation rejects illegal proposals (judge edit, broken
   `jsonFormat`, out-of-range knob); valid diff parses.
 - `profile.test.ts` — version increment, lineage, active-pointer, immutability;

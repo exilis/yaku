@@ -56,4 +56,32 @@ describe("optimize", () => {
     expect(out.best.config.maxIterations).toBe(3);
     expect(out.stopReason).toBe("plateau");
   });
+
+  it("throws on a non-finite plateauK to prevent an unbounded run", async () => {
+    await expect(
+      optimize({
+        baseline: { config: {} },
+        objective: { floor: 85, epsilon: 0.0001 },
+        maxIter: 5, budgetUsd: 100, plateauK: Number.POSITIVE_INFINITY,
+        propose: async () => null,
+        runCandidate: async () => res(90, 0.1),
+      })
+    ).rejects.toThrow(/plateauK/);
+  });
+
+  it("emits ledger entries: baseline then accept/reject with spendSoFar", async () => {
+    const entries: Array<{ iter: number; decision: string; best: boolean }> = [];
+    const proposals: Candidate[] = [{ config: { maxIterations: 2 }, rationale: "cheaper" }];
+    let i = 0;
+    await optimize({
+      baseline: { config: { maxIterations: 3 } },
+      objective: { floor: 85, epsilon: 0.0001 },
+      maxIter: 5, budgetUsd: 100, plateauK: 2,
+      propose: async () => proposals[i++] ?? null,
+      runCandidate: async (c) => (c.config.maxIterations === 3 ? res(90, 0.50) : res(88, 0.20)),
+      onIteration: (e) => entries.push({ iter: e.iter, decision: e.decision, best: e.best }),
+    });
+    expect(entries[0]).toEqual({ iter: 0, decision: "baseline", best: true });
+    expect(entries[1]).toEqual({ iter: 1, decision: "accept", best: true });
+  });
 });

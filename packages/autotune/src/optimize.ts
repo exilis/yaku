@@ -34,6 +34,16 @@ export interface OptimizeResult {
 }
 
 export async function optimize(args: OptimizeArgs): Promise<OptimizeResult> {
+  if (!Number.isInteger(args.maxIter) || args.maxIter < 0) {
+    throw new Error(`optimize: maxIter must be a non-negative integer, got ${args.maxIter}`);
+  }
+  if (!Number.isInteger(args.plateauK) || args.plateauK < 1) {
+    throw new Error(`optimize: plateauK must be a positive integer, got ${args.plateauK}`);
+  }
+  if (!Number.isFinite(args.budgetUsd) || args.budgetUsd < 0) {
+    throw new Error(`optimize: budgetUsd must be a finite non-negative number, got ${args.budgetUsd}`);
+  }
+
   // Baseline (iteration 0)
   let best = args.baseline;
   let bestMetrics = await args.runCandidate(best);
@@ -42,7 +52,7 @@ export async function optimize(args: OptimizeArgs): Promise<OptimizeResult> {
 
   let iterations = 0;
   let plateau = 0;
-  let stopReason: StopReason = "plateau";
+  let stopReason: StopReason = "max-iter";
 
   while (iterations < args.maxIter) {
     // propose
@@ -54,7 +64,10 @@ export async function optimize(args: OptimizeArgs): Promise<OptimizeResult> {
       continue;
     }
 
-    // budget guard BEFORE spending: estimate next cost ~= baseline candidate cost
+    // Budget guard (soft pre-check): we estimate the next candidate's cost as the
+    // current best's cost and stop before spending if it would exceed the budget.
+    // The actual post-run cost is still added unconditionally, so a single
+    // structurally-pricier candidate can overshoot slightly; the cap is best-effort.
     const estimatedNext = bestMetrics.estUsd;
     if (spend + estimatedNext > args.budgetUsd) { stopReason = "budget"; break; }
 

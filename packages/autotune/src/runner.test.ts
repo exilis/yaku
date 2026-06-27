@@ -58,4 +58,24 @@ describe("runCandidate", () => {
     });
     expect(result.unscoreable).toBe(true);
   });
+
+  it("counts a failed segment as a gate failure and a zero-score verdict", async () => {
+    const provider = new MockProvider({
+      // translator omits "t" -> segment fails; maxIterations default lets it retry then fail
+      translator: [{ translations: {} }, { translations: {} }, { translations: {} }],
+    });
+    const failCandidate = {
+      config: {
+        models: { translator: { provider: "mock", model: "m" } },
+        reviewer: { enabled: false },
+      },
+    };
+    const result = await runCandidate(failCandidate, gold, {
+      provider, tm: noopTm, judgeModel: "gpt-4o", translatorModelForPricing: "gpt-4o-mini",
+    });
+    expect(result.gatePassRate).toBe(0);     // the only segment failed -> 0 passes / 1 total
+    expect(result.quality).toBe(0);          // zero-score verdict
+    expect(result.scored).toBe(1);           // one (zero-score) verdict recorded
+    expect(result.unscoreable).toBe(false);  // no judge call was attempted (judgeAttempts=0)
+  });
 });

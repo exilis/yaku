@@ -17,10 +17,12 @@ export interface CandidateResult {
   gatePassRate: number;   // 0..1 fraction of segments with no gate warnings
   inputTokens: number;
   outputTokens: number;
-  scored: number;         // number of segments successfully judged
+  scored: number;         // number of segments contributing a quality verdict (includes zero-score failed segments)
   unscoreable: boolean;   // true if too many judge failures -> reject
   /** Aggregated judge critiques, fed back to the proposer as the gradient. */
   critiques: string[];
+  /** First judge-call error message, surfaced only when unscoreable. */
+  firstJudgeError?: string;
 }
 
 /** Per-1M-token USD prices, keyed by model id. */

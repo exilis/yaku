@@ -40,29 +40,30 @@ export async function runCandidate(
   let gateTotal = 0;
   let judgeAttempts = 0;
   let judgeFailures = 0;
+  let firstJudgeError: string | undefined;
   const verdicts: JudgeVerdict[] = [];
 
   for (const record of records) {
     const req = { ...record, config: buildConfig(candidate) };
+    const sourceById = new Map(record.document.segments.map((s) => [s.id, s.text]));
     const res = await translate(req, { provider: deps.provider, tm: deps.tm });
 
     for (const lr of res.results) {
       inputTokens += lr.summary.cost.inputTokens;
       outputTokens += lr.summary.cost.outputTokens;
 
-      // Map source text by id for judging.
-      const sourceById = new Map(record.document.segments.map((s) => [s.id, s.text]));
-
       for (const seg of lr.segments) {
         if (seg.status === "skipped") continue;
-        gateTotal++;
-        if (!seg.warnings || seg.warnings.length === 0) gatePass++;
 
         if (seg.status === "failed" || !seg.translatedText) {
-          // a failed segment counts as a zero-quality judged segment
+          // a hard translation failure is a gate failure (not a pass) and a zero-quality verdict
+          gateTotal++;
           verdicts.push({ score: 0, dims: { adequacy: 0, fluency: 0, terminology: 0, tone: 0 }, critique: "segment failed to translate" });
           continue;
         }
+
+        gateTotal++;
+        if (!seg.warnings || seg.warnings.length === 0) gatePass++;
 
         judgeAttempts++;
         try {
@@ -71,8 +72,9 @@ export async function runCandidate(
             { provider: deps.provider, model: deps.judgeModel }
           );
           verdicts.push(v);
-        } catch {
+        } catch (err) {
           judgeFailures++;
+          firstJudgeError ??= String(err);
         }
       }
     }
@@ -94,5 +96,6 @@ export async function runCandidate(
     scored: verdicts.length,
     unscoreable,
     critiques: agg.critiques,
+    firstJudgeError: unscoreable ? firstJudgeError : undefined,
   };
 }

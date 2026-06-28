@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@yaku/core": "workspace:*",
+    "@yaku/autotune": "workspace:*",
     "hono": "^4.6.0",
     "@hono/node-server": "^1.13.0"
   }

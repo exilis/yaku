@@ -9,7 +9,7 @@ export function createServer(deps?: Partial<TranslateDeps>) {
     provider: deps?.provider ?? createProvider({ provider: process.env.YAKU_PROVIDER ?? "openai" }),
     tm: deps?.tm ?? createTranslationMemory({ backend: "sqlite", path: process.env.YAKU_TM_PATH ?? "yaku-tm.sqlite" }),
   };
-  return createApp(resolved);
+  return createApp(resolved, { profileBase: process.env.YAKU_PROFILE_BASE });
 }
 
 // Run directly: node dist/index.js

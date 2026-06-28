@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { translate, TranslationRequestSchema, type TranslateDeps } from "@yaku/core";
 
-export function createApp(deps: TranslateDeps) {
+export function createApp(deps: TranslateDeps, opts?: { profileBase?: string }) {
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ status: "ok" }));
@@ -17,7 +17,16 @@ export function createApp(deps: TranslateDeps) {
     if (!parsed.success) {
       return c.json({ error: "validation failed", issues: parsed.error.issues }, 400);
     }
-    const res = await translate(parsed.data, deps);
+    let request: Record<string, unknown> = parsed.data as Record<string, unknown>;
+    if (opts?.profileBase) {
+      const { applyProfile } = await import("@yaku/autotune");
+      request = applyProfile(request, opts.profileBase);
+    }
+    const merged = TranslationRequestSchema.safeParse(request);
+    if (!merged.success) {
+      return c.json({ error: "profile merge produced invalid request", issues: merged.error.issues }, 400);
+    }
+    const res = await translate(merged.data, deps);
     return c.json(res);
   });
 

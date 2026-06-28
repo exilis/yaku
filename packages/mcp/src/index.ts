@@ -12,9 +12,13 @@ export interface ToolContent {
 }
 
 /** Pure translate handler — testable without spinning up the MCP transport. */
-export function makeTranslateHandler(deps: TranslateDeps) {
+export function makeTranslateHandler(deps: TranslateDeps, profileBase?: string) {
   return async (raw: unknown): Promise<ToolContent> => {
-    const request: TranslationRequest = TranslationRequestSchema.parse(raw);
+    let request: TranslationRequest = TranslationRequestSchema.parse(raw);
+    if (profileBase) {
+      const { applyProfile } = await import("@yaku/autotune");
+      request = TranslationRequestSchema.parse(applyProfile(request, profileBase));
+    }
     const res = await translate(request, deps);
     return { content: [{ type: "text", text: JSON.stringify(res) }] };
   };
@@ -36,9 +40,9 @@ export function makeLookupHandler(deps: TranslateDeps) {
   };
 }
 
-export function createMcpServer(deps: TranslateDeps): McpServer {
+export function createMcpServer(deps: TranslateDeps, profileBase?: string): McpServer {
   const server = new McpServer({ name: "yaku", version: "0.1.0" });
-  const handler = makeTranslateHandler(deps);
+  const handler = makeTranslateHandler(deps, profileBase);
   const invalidateHandler = makeInvalidateHandler(deps);
   const lookupHandler = makeLookupHandler(deps);
   const optStr = TranslationRequestSchema.shape.sourceLang.optional();
@@ -91,7 +95,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     provider: createProvider({ provider: process.env.YAKU_PROVIDER ?? "openai" }),
     tm: createTranslationMemory({ backend: "sqlite", path: process.env.YAKU_TM_PATH ?? "yaku-tm.sqlite" }),
   };
-  const server = createMcpServer(deps);
+  const server = createMcpServer(deps, process.env.YAKU_PROFILE_BASE);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

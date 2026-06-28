@@ -3,8 +3,8 @@ import { runGates, GATES } from "./index.js";
 import type { AssembledGroup } from "./types.js";
 
 describe("runGates", () => {
-  it("includes all five built-in gates", () => {
-    expect(GATES.map((g) => g.name)).toEqual(["placeholders", "markup", "glossary", "length", "leftover"]);
+  it("includes all six built-in gates", () => {
+    expect(GATES.map((g) => g.name)).toEqual(["placeholders", "markup", "glossary", "length", "leftover", "expansion"]);
   });
   it("aggregates violations across gates", () => {
     const g: AssembledGroup = {

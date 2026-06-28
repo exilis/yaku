@@ -95,7 +95,8 @@ memorized across candidates.
 ## Request / Response shape
 
 Input is a `TranslationRequest`: `sourceLang`, `targetLangs[]`, a `document` with `segments`
-(each with a stable `id`, `text`, optional `metadata` like `group`/`order`/`maxChars`/`doNotTranslate`),
+(each with a stable `id`, `text`, optional `metadata` like `group`/`order`/`maxChars`/`doNotTranslate`/`role`;
+`role: "ui-label"` marks a terse UI label so the expansion gate keeps it from ballooning into a sentence),
 optional `context`, `glossary`, and `config`. Output is a `TranslationResponse` with one
 `LanguageResult` per target language, each carrying per-segment results keyed by the same ids
 (with `status`, `sourceHash`, `tmMatch`, `confidence`, `warnings`). Every input id appears exactly

@@ -57,6 +57,10 @@ function fill(s: string, group: AssembledGroup): string {
   return s.replace(/\{sourceLang\}/g, group.sourceLang).replace(/\{targetLang\}/g, group.targetLang);
 }
 
+function escapeNewlines(s: string): string {
+  return s.replace(/\r\n/g, "\\n").replace(/\r/g, "\\n").replace(/\n/g, "\\n");
+}
+
 export interface TranslatorPromptExtras {
   critique?: string;
   gateViolations?: string[];
@@ -83,11 +87,11 @@ export function buildTranslatorPrompt(
   for (const s of group.segments) {
     const role = s.metadata?.role ? ` (role: ${s.metadata.role})` : "";
     const notes = s.metadata?.notes ? ` [note: ${s.metadata.notes}]` : "";
-    lines.push(`- id="${s.id}"${role}${notes}: ${s.text}`);
+    lines.push(`- id="${s.id}"${role}${notes}: ${escapeNewlines(s.text)}`);
   }
   if (extras.suggestions && Object.keys(extras.suggestions).length) {
     lines.push(`\n${t.suggestionsHeader}`);
-    for (const [id, sug] of Object.entries(extras.suggestions)) lines.push(`- id="${id}": ${sug}`);
+    for (const [id, sug] of Object.entries(extras.suggestions)) lines.push(`- id="${id}": ${escapeNewlines(sug)}`);
   }
   if (extras.gateViolations?.length) {
     lines.push(`\n${t.gateViolationsHeader}`);
@@ -110,7 +114,7 @@ export function buildReviewerPrompt(
   if (group.context) lines.push(`\n${t.contextLabel}\n${group.context}`);
   lines.push(`\n${t.pairsHeader}`);
   for (const s of group.segments) {
-    lines.push(`- id="${s.id}": SOURCE: ${s.text}  | TARGET: ${draft[s.id] ?? "(missing)"}`);
+    lines.push(`- id="${s.id}": SOURCE: ${escapeNewlines(s.text)}  | TARGET: ${escapeNewlines(draft[s.id] ?? "(missing)")}`);
   }
   return lines.join("\n");
 }
@@ -124,6 +128,6 @@ export function buildBackTranslationPrompt(
   const lines: string[] = [];
   lines.push(fill(t.instruction, group));
   lines.push(fill(t.jsonFormat, group));
-  for (const s of group.segments) lines.push(`- id="${s.id}": ${draft[s.id] ?? ""}`);
+  for (const s of group.segments) lines.push(`- id="${s.id}": ${escapeNewlines(draft[s.id] ?? "")}`);
   return lines.join("\n");
 }
